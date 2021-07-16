@@ -1,0 +1,24 @@
+cmake_minimum_required(VERSION 3.10)
+project(CROSS LANGUAGES C CXX CUDA)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+set(CMAKE_CUDA_STANDARD 14)
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+# Requires cmake 3.18
+# set(CMAKE_CUDA_ARCHITECTURES 70 75 80)
+
+FIND_PACKAGE(Boost 1.71 COMPONENTS program_options REQUIRED)
+
+file(GLOB_RECURSE CPP_SOURCES RELATIVE ${CMAKE_SOURCE_DIR} "src/*.cpp")
+file(GLOB_RECURSE CUDA_SOURCES RELATIVE ${CMAKE_SOURCE_DIR} "src/*.cu")
+
+add_executable(cross ${CPP_SOURCES} ${CUDA_SOURCES})
+
+target_include_directories(cross PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+target_include_directories(cross PRIVATE ${Boost_INCLUDE_DIRS})
+target_link_libraries(cross PUBLIC ${Boost_LIBRARIES})
+
+target_compile_options(cross PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-gencode arch=compute_70,code=[compute_70,sm_70,sm_75,sm_80]>)
