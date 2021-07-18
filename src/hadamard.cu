@@ -16,8 +16,8 @@ namespace cross
 
 template<typename T>
 __global__ void hadamard_original(
-    T* __restrict__ deformed,
     const T* __restrict__ ref,
+    T* __restrict__ deformed,
     dsize2_t subregion_size,
     dsize_t subregions_per_pic,
     dsize_t batch_size
@@ -42,15 +42,15 @@ __global__ void hadamard_original(
 
 template<typename T>
 void run_hadamard_original(
-    T* deformed,
     const T* ref,
+    T* deformed,
     dsize2_t subregion_size,
     dsize_t subregions_per_pic,
     dsize_t batch_size,
     dsize_t num_threads
 ) {
     dsize_t num_blocks = div_up(subregion_size.area() * subregions_per_pic, num_threads);
-    hadamard_original<<<num_blocks, num_threads>>>(deformed, ref, subregion_size, subregions_per_pic, batch_size);
+    hadamard_original<<<num_blocks, num_threads>>>(ref, deformed, subregion_size, subregions_per_pic, batch_size);
 }
 
 }

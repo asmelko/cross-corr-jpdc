@@ -28,8 +28,8 @@ public:
 
     void run() {
         run_cross_corr_naive_original<typename MAT::value_type, typename MAT::value_type>(
-            d_target_,
             d_ref_,
+            d_target_,
             d_res_,
             target_.size(),
             res_.size(),

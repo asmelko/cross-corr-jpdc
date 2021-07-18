@@ -35,8 +35,8 @@ namespace cross
  */
 template<typename T, typename RES>
 __global__ void cross_corr_naive_original(
-    const T* __restrict__ deformed,
     const T* __restrict__ ref,
+    const T* __restrict__ deformed,
     RES* __restrict__ out,
     dsize2_t subregion_size,
     dsize2_t search_size,
@@ -68,18 +68,29 @@ __global__ void cross_corr_naive_original(
     out += region_idx * search_size.area();
 
     for (dsize_t i = 0; i < batch_size; ++i) {
-        dsize_t x_start = max(-shift.x, 0);
-        dsize_t x_end = min(subregion_size.x - shift.x, subregion_size.x);
-        dsize_t y_start = max(-shift.y, 0);
-        dsize_t y_end = min(subregion_size.y - shift.y, subregion_size.y);
+        // The code is different from the original as here we are sliding the
+        // deformed region over the reference region, whereas the original
+        // did it the other way, which is incorrect in my opinion
+        // or at least inconsistent with the text of the thesis
+        // where it is defined as reference * deformed
+        // and the algorithm clearly states that this means sliding the deformed
+        //
+        // The results also now match the results of matlab xcorr2
+        dsize_t x_ref_start = max(shift.x, 0);
+        dsize_t x_ref_end = min(subregion_size.x + shift.x, subregion_size.x);
+        dsize_t y_ref_start = max(shift.y, 0);
+        dsize_t y_ref_end = min(subregion_size.y + shift.y, subregion_size.y);
 
         RES sum = 0;
-        for (dsize_t y = y_start; y < y_end; ++y) {
-            for (dsize_t x = x_start; x < x_end; ++x) {
-                int x_shifted = x + shift.x;
-                int y_shifted = y + shift.y;
+        for (dsize_t y_ref = y_ref_start; y_ref < y_ref_end; ++y_ref) {
+            for (dsize_t x_ref = x_ref_start; x_ref < x_ref_end; ++x_ref) {
+                // If deformed is shifted by -10, the we are starting from [0,0] in ref
+                // and need to start from [10,10] in deformed, as there are 10
+                // values to the left and on top outside the reference matrix
+                int x_shifted = x_ref - shift.x;
+                int y_shifted = y_ref - shift.y;
 
-                sum += deformed[y_shifted * subregion_size.x + x_shifted] * ref[y * subregion_size.x + x];
+                sum += deformed[y_shifted * subregion_size.x + x_shifted] * ref[y_ref * subregion_size.x + x_ref];
             }
         }
 
@@ -117,8 +128,8 @@ TODO: Try using the whole warp for computation of a single shift
 
 template<typename T, typename RES>
 void run_cross_corr_naive_original(
-    const T* __restrict__ deformed,
     const T* __restrict__ ref,
+    const T* __restrict__ deformed,
     RES* __restrict__ out,
     dsize2_t subregion_size,
     dsize2_t search_size,
@@ -132,8 +143,8 @@ void run_cross_corr_naive_original(
     );
 
     cross_corr_naive_original<<<num_blocks, num_threads>>>(
-        deformed,
         ref,
+        deformed,
         out,
         subregion_size,
         search_size,
@@ -143,8 +154,8 @@ void run_cross_corr_naive_original(
 }
 
 template void run_cross_corr_naive_original<int, int>(
-    const int* __restrict__ deformed,
     const int* __restrict__ ref,
+    const int* __restrict__ deformed,
     int* __restrict__ out,
     dsize2_t subregion_size,
     dsize2_t search_size,
@@ -153,8 +164,8 @@ template void run_cross_corr_naive_original<int, int>(
 );
 
 template void run_cross_corr_naive_original<float, float>(
-    const float* __restrict__ deformed,
     const float* __restrict__ ref,
+    const float* __restrict__ deformed,
     float* __restrict__ out,
     dsize2_t subregion_size,
     dsize2_t search_size,
@@ -163,8 +174,8 @@ template void run_cross_corr_naive_original<float, float>(
 );
 
 template void run_cross_corr_naive_original<double, double>(
-    const double* __restrict__ deformed,
     const double* __restrict__ ref,
+    const double* __restrict__ deformed,
     double* __restrict__ out,
     dsize2_t subregion_size,
     dsize2_t search_size,

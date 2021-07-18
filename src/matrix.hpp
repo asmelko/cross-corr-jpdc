@@ -119,6 +119,8 @@ namespace impl {
 
         template <typename CONT>
         void write_data(std::ostream& out, dsize2_t matrix_size, const CONT& data) {
+            // TODO: Set precision
+            out << std::fixed;
             for (dsize_t y = 0; y < matrix_size.y; ++y) {
                 auto col_sep = "";
                 for (dsize_t x = 0; x < matrix_size.x; ++x) {

@@ -8,10 +8,10 @@ else
     dev.Name, dev.MultiprocessorCount, dev.ComputeCapability);
 end
 
-cpp_xcor = readmatrix('cpp_xcor.csv');
+cpp_xcor = readmatrix('../outputs/out_cpp.csv', 'NumHeaderLines', 1);
 
-in1 = readmatrix('in1.csv');
-in2 = readmatrix('in2.csv');
+in1 = readmatrix('../outputs/in1.csv', 'NumHeaderLines', 1);
+in2 = readmatrix('../outputs/in2.csv', 'NumHeaderLines', 1);
 
 g_in1 = gpuArray(in1);
 g_in2 = gpuArray(in2);

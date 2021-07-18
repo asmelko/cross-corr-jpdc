@@ -22,22 +22,28 @@ int main(int argc, char **argv) {
     if (argc != 4) {
         std::cerr << "Invalid number of arguments, expected " << 4 << " , got " << argc - 1 << "\n";
         std::cerr << "Usage: " << argv[0] << " <ref_path> <target_path> <out_path>\n";
+        return 1;
     }
+    try {
+        mat ref;
+        mat target;
+        load_inputs(argv[1], argv[2], ref, target);
 
-    mat ref;
-    mat target;
-    load_inputs(argv[1], argv[2], ref, target);
 
+        naive<mat> alg{std::move(ref), std::move(target)};
+        alg.prepare();
 
-    naive<mat> alg{std::move(ref), std::move(target)};
-    alg.prepare();
+        alg.run();
 
-    alg.run();
+        alg.finalize();
 
-    alg.finalize();
+        auto res = alg.results();
 
-    auto res = alg.results();
-
-    std::ofstream out_file(argv[3]);
-    res.store_to_csv(out_file);
+        std::ofstream out_file(argv[3]);
+        res.store_to_csv(out_file);
+    }
+    catch (std::exception& e) {
+        std::cerr << "Exception occured: " << e.what() << std::endl;
+        return 2;
+    }
 }
