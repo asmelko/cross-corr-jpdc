@@ -9,14 +9,6 @@ using namespace cross;
 
 using mat = matrix<float, pinned_allocator<float>>;
 
-void load_inputs(const char* ref_path, const char* target_path, mat& out_ref, mat& out_target) {
-    std::ifstream ref_file(ref_path);
-    std::ifstream target_file(target_path);
-
-    out_ref = mat::load_from_csv(ref_file);
-    out_target = mat::load_from_csv(target_file);
-}
-
 int main(int argc, char **argv) {
     // TODO: Better argument parsing
     if (argc != 4) {
@@ -25,13 +17,11 @@ int main(int argc, char **argv) {
         return 1;
     }
     try {
-        mat ref;
-        mat target;
-        load_inputs(argv[1], argv[2], ref, target);
 
 
-        naive<mat> alg{std::move(ref), std::move(target)};
-        alg.prepare();
+        //naive_original_alg<mat> alg{std::move(ref), std::move(target)};
+        fft_original_alg<mat, true> alg;
+        alg.prepare(argv[1], argv[2]);
 
         alg.run();
 

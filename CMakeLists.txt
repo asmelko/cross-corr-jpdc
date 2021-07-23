@@ -10,15 +10,22 @@ set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 # Requires cmake 3.18
 # set(CMAKE_CUDA_ARCHITECTURES 70 75 80)
 
+# TODO: Change to FindCUDAToolkit if we switch to cmake 3.17+
+# See https://stackoverflow.com/questions/27018340/cmake-does-not-properly-find-cuda-library
+FIND_PACKAGE(CUDA 11.4 REQUIRED)
 FIND_PACKAGE(Boost 1.71 COMPONENTS program_options REQUIRED)
+
 
 file(GLOB_RECURSE CPP_SOURCES RELATIVE ${CMAKE_SOURCE_DIR} "src/*.cpp")
 file(GLOB_RECURSE CUDA_SOURCES RELATIVE ${CMAKE_SOURCE_DIR} "src/*.cu")
 
 add_executable(cross ${CPP_SOURCES} ${CUDA_SOURCES})
 
-target_include_directories(cross PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
-target_include_directories(cross PRIVATE ${Boost_INCLUDE_DIRS})
+target_include_directories(cross PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+target_include_directories(cross PUBLIC ${Boost_INCLUDE_DIRS})
 target_link_libraries(cross PUBLIC ${Boost_LIBRARIES})
+target_link_libraries(cross PUBLIC ${CUDA_CUFFT_LIBRARIES})
 
 target_compile_options(cross PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-gencode arch=compute_70,code=[compute_70,sm_70,sm_75,sm_80]>)
+#target_compile_options(cross PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-gencode arch=compute_70,code=[compute_70,sm_70,sm_75,sm_80] -G -Xcompiler -rdynamic>)
+#target_compile_options(cross PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-g -rdynamic>)

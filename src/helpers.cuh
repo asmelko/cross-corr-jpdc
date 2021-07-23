@@ -9,6 +9,8 @@
 
 #include "types.cuh"
 
+// TODO: Move to host helpers
+#include <vector>
 
 namespace cross {
 
@@ -32,30 +34,19 @@ inline __host__ __device__ T div_up(T a, U b)
 	return (a + b - 1) / b;
 }
 
-// TODO: Static assert that the generic function is not called
 template<typename T>
-class parser {
-public:
-	static inline T from_string(const std::string& in) {
-		throw std::runtime_error{"Invalid parser, should not happen"};
-	}
-};
+inline T from_string(const std::string& in);
 
 
 template<>
-class parser<float> {
-public:
-	static float from_string(const std::string& in){
+inline float from_string<float>(const std::string& in){
 		return std::stof(in);
-	}
-};
+}
 
 template<>
-class parser<double> {
-	static double from_string(const std::string& in) {
-		return std::stod(in);
-	}
-};
+inline double from_string<double>(const std::string& in) {
+	return std::stod(in);
+}
 
 /** Allocates device buffer large enough to hold \p num instances of T
  *
@@ -86,6 +77,17 @@ void cuda_memcpy_from_device(T* dst, T* src, dsize_t num) {
 template<typename MAT>
 void cuda_memcpy_from_device(MAT& dst, typename MAT::value_type* src) {
 	cuda_memcpy_from_device(dst.data(), src, dst.area());
+}
+
+
+// TODO: Move to host helpers
+inline std::ostream& operator<<(std::ostream& out, const std::vector<float2>& vec) {
+	std::string sep = "";
+	for(auto&& val: vec) {
+		out << sep << "[" << val.x << "," << val.y <<"]";
+		sep = ", ";
+	}
+	return out;
 }
 
 }

@@ -18,6 +18,8 @@ g_in2 = gpuArray(in2);
 
 g_xcor = xcorr2(g_in1, g_in2);
 
+writematrix(gather(g_xcor), '../outputs/out_matlab.csv')
+
 g_diff = g_xcor - gpuArray(cpp_xcor);
 
 mean2(g_diff)

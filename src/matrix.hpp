@@ -15,6 +15,33 @@
 
 namespace cross {
 
+class no_padding {
+public:
+    static dsize2_t total_size(dsize2_t matrix_size) {
+        return matrix_size;
+    }
+
+    template<typename IT>
+    static void pad_row(IT begin, IT end) {
+        return;
+    }
+};
+
+template<dsize_t MULT>
+class relative_zero_padding {
+public:
+    static dsize2_t total_size(dsize2_t matrix_size) {
+        return matrix_size * MULT;
+    }
+
+    template<typename IT>
+    static void pad_row(IT begin, IT end) {
+        for (auto it = begin; it != end; ++it) {
+            *it = 0;
+        }
+    }
+};
+
 namespace impl {
     // namespace binary {
 
@@ -85,8 +112,8 @@ namespace impl {
             return dsize2_t{width, height};
         }
 
-        template <typename CONT>
-        void read_data(std::istream& in, dsize2_t matrix_size, CONT& out) {
+        template <typename CONT, typename PADDING>
+        void read_data(std::istream& in, dsize2_t matrix_size, dsize2_t padded_size, CONT& out) {
             for (dsize_t y = 0; y < matrix_size.y; ++y) {
                 std::string line;
                 if (!std::getline(in, line)) {
@@ -98,7 +125,7 @@ namespace impl {
                 auto it = tok.begin();
                 dsize_t x = 0;
                 for (;it != tok.end() && x < matrix_size.x; ++x, ++it) {
-                    out[dsize2_t{x, y}.linear_idx(matrix_size.x)] = parser<typename CONT::value_type>::from_string(*it);
+                    out[dsize2_t{x, y}.linear_idx(padded_size.x)] = from_string<typename CONT::value_type>(*it);
                 }
 
                 if (it != tok.end()) {
@@ -108,8 +135,22 @@ namespace impl {
                 if (x != matrix_size.x) {
                     throw std::runtime_error{std::string{"Line"} + std::to_string(y) + " is too short, expected " + std::to_string(matrix_size.x) + ", got " + std::to_string(x) + " values"};
                 }
+
+                dsize_t padding_start_idx = dsize2_t{x, y}.linear_idx(padded_size.x);
+                dsize_t padding_end_idx = padding_start_idx + padded_size.x - x;
+                PADDING::pad_row(
+                    out.begin() + padding_start_idx,
+                    out.begin() + padding_end_idx
+                );
             }
             // TODO: Check that we read the whole file
+
+            for (dsize_t y = matrix_size.y; y < padded_size.y; ++y) {
+                PADDING::pad_row(
+                    out.begin() + dsize2_t{0, y}.linear_idx(padded_size.x),
+                    out.begin() + dsize2_t{padded_size.x, y}.linear_idx(padded_size.x)
+                );
+            }
         }
 
 
@@ -162,12 +203,15 @@ public:
         :size_(size), data_(size.area())
     { }
 
+    template<typename PADDING>
     static matrix<T, ALLOC> load_from_csv(std::istream& in) {
         auto size = impl::csv::read_size(in);
+        auto padded_size = PADDING::total_size(size);
 
-        std::vector<T, ALLOC> data(size.area());
-        impl::csv::read_data(in, size, data);
-        return matrix{size, std::move(data)};
+        std::vector<T, ALLOC> data(padded_size.area());
+        impl::csv::read_data<decltype(data), PADDING>(in, size, padded_size, data);
+
+        return matrix{padded_size, std::move(data)};
     }
 
     void store_to_csv(std::ostream& out) const {

@@ -47,10 +47,31 @@ void run_hadamard_original(
     dsize2_t subregion_size,
     dsize_t subregions_per_pic,
     dsize_t batch_size,
+    // TODO: Change to something more general and less implementation dependant
     dsize_t num_threads
 ) {
     dsize_t num_blocks = div_up(subregion_size.area() * subregions_per_pic, num_threads);
     hadamard_original<<<num_blocks, num_threads>>>(ref, deformed, subregion_size, subregions_per_pic, batch_size);
 }
+
+template void run_hadamard_original<cufftComplex>(
+    const cufftComplex* ref,
+    cufftComplex* deformed,
+    dsize2_t subregion_size,
+    dsize_t subregions_per_pic,
+    dsize_t batch_size,
+    // TODO: Change to something more general and less implementation dependant
+    dsize_t num_threads
+);
+
+template void run_hadamard_original<cufftDoubleComplex>(
+    const cufftDoubleComplex* ref,
+    cufftDoubleComplex* deformed,
+    dsize2_t subregion_size,
+    dsize_t subregions_per_pic,
+    dsize_t batch_size,
+    // TODO: Change to something more general and less implementation dependant
+    dsize_t num_threads
+);
 
 }
