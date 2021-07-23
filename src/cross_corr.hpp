@@ -100,10 +100,10 @@ public:
 
         if (DEBUG)
         {
-            std::ofstream out_file("../outputs/ref.csv");
+            std::ofstream out_file("../data/ref.csv");
             ref_.store_to_csv(out_file);
 
-            std::ofstream out_file("../outputs/target.csv");
+            std::ofstream out_file("../data/target.csv");
             target_.store_to_csv(out_file);
         }
 
@@ -135,7 +135,7 @@ public:
             std::vector<fft_complex_t> tmp(fft_buffer_size_);
             cuda_memcpy_from_device(tmp.data(), d_ref_fft_, tmp.size());
 
-            std::ofstream out("../outputs/ref_fft.csv");
+            std::ofstream out("../data/ref_fft.csv");
             out << tmp << std::endl;
         }
 
@@ -144,7 +144,7 @@ public:
             std::vector<fft_complex_t> tmp(fft_buffer_size_);
             cuda_memcpy_from_device(tmp.data(), d_target_fft_, tmp.size());
 
-            std::ofstream out("../outputs/target_fft.csv");
+            std::ofstream out("../data/target_fft.csv");
             out << tmp << std::endl;
         }
 
@@ -162,7 +162,7 @@ public:
             std::vector<fft_complex_t> tmp(fft_buffer_size_);
             cuda_memcpy_from_device(tmp.data(), d_target_fft_, tmp.size());
 
-            std::ofstream out("../outputs/hadamard.csv");
+            std::ofstream out("../data/hadamard.csv");
             out << tmp << std::endl;
         }
 
