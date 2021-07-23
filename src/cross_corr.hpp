@@ -1,10 +1,13 @@
 #pragma once
 
+#include <vector>
+#include <chrono>
 
 #include <cufft.h>
 
 #include "matrix.hpp"
 #include "helpers.cuh"
+#include "stopwatch.hpp"
 
 #include "kernels.cuh"
 
@@ -14,25 +17,40 @@ namespace cross {
 
 template<typename MAT>
 class cross_corr_alg {
+private:
+    using sw_clock = std::chrono::high_resolution_clock;
 public:
+    cross_corr_alg(std::size_t num_measurements)
+        :sw_(num_measurements)
+    {}
+
     virtual void prepare(const std::string& ref_path, const std::string&) = 0;
     virtual void run() = 0;
     virtual void finalize() = 0;
 
-    virtual const MAT& results() = 0;
+    virtual const MAT& results() const = 0;
+    virtual const std::vector<std::string>& measurement_labels() const = 0;
+
+    const std::vector<sw_clock::duration> measurements() const {
+        return sw_.results();
+    }
 protected:
+
+
     template<typename PADDING>
     static MAT load_matrix_from_csv(const std::string& path) {
         std::ifstream file(path);
         return MAT::template load_from_csv<PADDING>(file);
     }
+
+    StopWatch<sw_clock> sw_;
 };
 
 template<typename MAT, bool DEBUG = false>
 class naive_original_alg: public cross_corr_alg<MAT> {
 public:
     naive_original_alg()
-        :ref_(), target_(), res_()
+        :cross_corr_alg<MAT>(labels.size()), ref_(), target_(), res_()
     {
 
     }
@@ -73,7 +91,14 @@ public:
         return res_;
     }
 
+    const std::vector<std::string>& measurement_labels() const override {
+        return labels;
+    }
+
 private:
+
+    static std::vector<std::string> labels;
+
     MAT ref_;
     MAT target_;
 
@@ -84,16 +109,21 @@ private:
     typename MAT::value_type* d_res_;
 };
 
+template<typename MAT, bool DEBUG>
+std::vector<std::string> naive_original_alg<MAT, DEBUG>::labels{
+
+};
+
 template<typename MAT, bool DEBUG = false>
 class fft_original_alg: public cross_corr_alg<MAT> {
 public:
     fft_original_alg()
-        :ref_(), target_(), res_(), fft_buffer_size_(0)
+        :cross_corr_alg<MAT>(labels.size()), ref_(), target_(), res_(), fft_buffer_size_(0)
     {
 
     }
 
-    void prepare(const std::string& ref_path, const std::string& target_path) {
+    void prepare(const std::string& ref_path, const std::string& target_path) override {
 
         ref_ = cross_corr_alg<MAT>::template load_matrix_from_csv<relative_zero_padding<2>>(ref_path);
         target_ = cross_corr_alg<MAT>::template load_matrix_from_csv<relative_zero_padding<2>>(target_path);
@@ -103,7 +133,7 @@ public:
             std::ofstream out_file("../data/ref.csv");
             ref_.store_to_csv(out_file);
 
-            std::ofstream out_file("../data/target.csv");
+            out_file = std::ofstream("../data/target.csv");
             target_.store_to_csv(out_file);
         }
 
@@ -126,9 +156,11 @@ public:
         FFTCH(cufftPlan2d(&fft_inv_plan_, ref_.size().y, ref_.size().x, fft_type_C2R<typename MAT::value_type>()));
     }
 
-    void run() {
-        fft_real_to_complex(fft_plan_, d_ref_, d_ref_fft_);
-        fft_real_to_complex(fft_plan_, d_target_, d_target_fft_);
+    void run() override {
+        CPU_MEASURE(0,
+            fft_real_to_complex(fft_plan_, d_ref_, d_ref_fft_);
+            fft_real_to_complex(fft_plan_, d_target_, d_target_fft_);
+        );
 
         if (DEBUG)
         {
@@ -137,24 +169,23 @@ public:
 
             std::ofstream out("../data/ref_fft.csv");
             out << tmp << std::endl;
-        }
 
-        if (DEBUG)
-        {
-            std::vector<fft_complex_t> tmp(fft_buffer_size_);
             cuda_memcpy_from_device(tmp.data(), d_target_fft_, tmp.size());
 
-            std::ofstream out("../data/target_fft.csv");
+            out = std::ofstream("../data/target_fft.csv");
             out << tmp << std::endl;
         }
 
-        run_hadamard_original(
-            d_ref_fft_,
-            d_target_fft_,
-            {ref_.size().y, (ref_.size().x / 2) + 1},
-            1,
-            1,
-            256);
+
+        CUDA_MEASURE(1,
+            run_hadamard_original(
+                d_ref_fft_,
+                d_target_fft_,
+                {ref_.size().y, (ref_.size().x / 2) + 1},
+                1,
+                1,
+                256)
+        );
 
         if (DEBUG)
         {
@@ -166,23 +197,31 @@ public:
             out << tmp << std::endl;
         }
 
-        fft_complex_to_real(fft_inv_plan_, d_target_fft_, d_res_);
+        CUDA_MEASURE(2,
+            fft_complex_to_real(fft_inv_plan_, d_target_fft_, d_res_)
+        );
 
         CUCH(cudaDeviceSynchronize());
         CUCH(cudaGetLastError());
     }
 
-    void finalize() {
+    void finalize() override {
         cuda_memcpy_from_device(res_, d_res_);
     }
 
-    const MAT& results() {
+    const MAT& results() const override {
         return res_;
+    }
+
+    const std::vector<std::string>& measurement_labels() const override {
+        return labels;
     }
 
 private:
     using fft_real_t = typename real_trait<typename MAT::value_type>::type;
     using fft_complex_t = typename complex_trait<typename MAT::value_type>::type;
+
+    static std::vector<std::string> labels;
 
     MAT ref_;
     MAT target_;
@@ -200,6 +239,13 @@ private:
 
     fft_complex_t* d_ref_fft_;
     fft_complex_t* d_target_fft_;
+};
+
+template<typename MAT, bool DEBUG>
+std::vector<std::string> fft_original_alg<MAT, DEBUG>::labels{
+    "Forward FFT",
+    "Hadamard",
+    "Inverse FFT"
 };
 
 }
