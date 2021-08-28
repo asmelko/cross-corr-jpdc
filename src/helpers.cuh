@@ -79,6 +79,15 @@ void cuda_memcpy_from_device(MAT& dst, typename MAT::value_type* src) {
 	cuda_memcpy_from_device(dst.data(), src, dst.area());
 }
 
+template<typename T>
+inline std::ostream& operator<<(std::ostream& out, const std::vector<T>& vec) {
+	std::string sep = "";
+	for(auto&& val: vec) {
+		out << sep << val;
+		sep = ", ";
+	}
+	return out;
+}
 
 // TODO: Move to host helpers
 inline std::ostream& operator<<(std::ostream& out, const std::vector<float2>& vec) {

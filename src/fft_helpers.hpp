@@ -176,4 +176,67 @@ inline void fft_complex_to_real<cufftDoubleReal>(cufftHandle plan, cufftDoubleRe
     FFTCH(cufftExecZ2D(plan, (cufftDoubleComplex*)in_out, in_out));
 }
 
+template<typename MAT_IN, typename MAT_OUT>
+void copy_quadrant(const MAT_IN& src, MAT_OUT& tgt, dsize2_t src_pos, dsize2_t size, dsize2_t tgt_pos) {
+    for (dsize_t y = 0; y < size.y; ++y) {
+        for (dsize_t x = 0; x < size.x; ++x) {
+            dsize2_t offset{x, y};
+            // Normalize the results from cuFFT by dividing by the number of elements
+            tgt[tgt_pos + offset] = src[src_pos + offset] / src.area();
+        }
+    }
+}
+
+template<typename MAT_IN, typename MAT_OUT>
+MAT_OUT normalize_fft_results(const MAT_IN& res) {
+    MAT_OUT norm{res.size() - 1};
+
+    // We need to swap top left with bottom right and top right with bottom left quadrants
+    // We also need to remove "empty" row and column both at res.size() / 2,
+    // which split the res matrix into the afforementioned quadrants
+    // So for example with res matrix being 20x20, the top left is 10x10
+    // top right is 9x10, bottom left is 10x9 and bottom right is 9x9
+    // and we need to put them into a 19x19 matrix
+    // It fits, as both 19*19 = 361 = 10*10 + 9*10 + 10*9 + 9*9
+
+    // For odd sized matricies, the empty row and column should also be at floor(res.size() / 2)
+    // so for 19x19, they should be at index 9 and all quadrants should be the same 9x9
+
+    // We also need to normalize the results, as cuFFT computes unnormalized FFT, so every
+    // element of the resulting matrix is multiplied by the number of elements of the matrix
+    // so for 20x20 result, each element is multiplied by 400
+
+    // Row and column in the res matrix containing empty values
+    // Also tells us the size of the top left quadrant
+    auto empty_x = res.size().x / 2;
+    auto empty_y = res.size().y / 2;
+
+    // res top left quadrant
+    copy_quadrant(res, norm,
+        dsize2_t{0, 0},
+        dsize2_t{empty_x, empty_y},
+        dsize2_t{norm.size().x / 2, norm.size().y / 2}
+    );
+    // res top right quadrant
+    copy_quadrant(res, norm,
+        dsize2_t{empty_x + 1, 0},
+        dsize2_t{res.size().x - empty_x - 1, empty_y},
+        dsize2_t{0, norm.size().y / 2}
+    );
+    // res bottom left quadrant
+    copy_quadrant(res, norm,
+        dsize2_t{0, empty_y + 1},
+        dsize2_t{empty_x, res.size().y - empty_y - 1},
+        dsize2_t{norm.size().x / 2, 0}
+    );
+    // res bottom right quadrant
+    copy_quadrant(res, norm,
+        dsize2_t{empty_x + 1, empty_y + 1},
+        dsize2_t{res.size().x - empty_x - 1, res.size().y - empty_y - 1},
+        dsize2_t{0, 0}
+    );
+
+    return norm;
+}
+
 }

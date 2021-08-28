@@ -33,9 +33,16 @@ __global__ void hadamard_original(
 
     for (dsize_t i = ref_idx; i < subregion_size.area() * subregions_per_pic * batch_size; i += subregion_size.area() * subregions_per_pic) {
         // Complex multiplication of complex conjugate of "ref" with "deformed"
+        // Ref complex conjugate
+        // deformed[i] = {
+        //     ref[ref_idx].x * deformed[i].x + ref[ref_idx].y * deformed[i].y,
+        //     ref[ref_idx].x * deformed[i].y - ref[ref_idx].y * deformed[i].x
+        // };
+
+        // Deformed complex conjugate
         deformed[i] = {
             ref[ref_idx].x * deformed[i].x + ref[ref_idx].y * deformed[i].y,
-            ref[ref_idx].x * deformed[i].y - ref[ref_idx].y * deformed[i].x
+            - ref[ref_idx].x * deformed[i].y + ref[ref_idx].y * deformed[i].x
         };
     }
 }

@@ -20,8 +20,8 @@ class cross_corr_alg {
 private:
     using sw_clock = std::chrono::high_resolution_clock;
 public:
-    cross_corr_alg(std::size_t num_measurements)
-        :sw_(num_measurements)
+    cross_corr_alg(bool is_fft, std::size_t num_measurements)
+        :is_fft_(is_fft), sw_(num_measurements)
     {}
 
     virtual void prepare(const std::string& ref_path, const std::string&) = 0;
@@ -30,6 +30,10 @@ public:
 
     virtual const MAT& results() const = 0;
     virtual const std::vector<std::string>& measurement_labels() const = 0;
+
+    bool is_fft() const {
+        return is_fft_;
+    }
 
     const std::vector<sw_clock::duration> measurements() const {
         return sw_.results();
@@ -43,6 +47,7 @@ protected:
         return MAT::template load_from_csv<PADDING>(file);
     }
 
+    bool is_fft_;
     StopWatch<sw_clock> sw_;
 };
 
@@ -50,7 +55,7 @@ template<typename MAT, bool DEBUG = false>
 class naive_original_alg: public cross_corr_alg<MAT> {
 public:
     naive_original_alg()
-        :cross_corr_alg<MAT>(labels.size()), ref_(), target_(), res_()
+        :cross_corr_alg<MAT>(false, labels.size()), ref_(), target_(), res_()
     {
 
     }
@@ -118,7 +123,7 @@ template<typename MAT, bool DEBUG = false>
 class fft_original_alg: public cross_corr_alg<MAT> {
 public:
     fft_original_alg()
-        :cross_corr_alg<MAT>(labels.size()), ref_(), target_(), res_(), fft_buffer_size_(0)
+        :cross_corr_alg<MAT>(true, labels.size()), ref_(), target_(), res_(), fft_buffer_size_(0)
     {
 
     }

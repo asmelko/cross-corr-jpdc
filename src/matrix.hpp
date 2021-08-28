@@ -88,7 +88,7 @@ namespace impl {
     // }
 
     namespace csv {
-        dsize2_t read_size(std::istream& in) {
+        inline dsize2_t read_size(std::istream& in) {
             std::string line;
             if (!std::getline(in, line)) {
                 // TODO: Error
@@ -154,7 +154,7 @@ namespace impl {
         }
 
 
-        void write_size(std::ostream& out, dsize2_t size) {
+        inline void write_size(std::ostream& out, dsize2_t size) {
             out << size.x << "," << size.y << "\n";
         }
 
@@ -175,7 +175,7 @@ namespace impl {
     }
 }
 
-template<typename T, typename ALLOC>
+template<typename T, typename ALLOC = std::allocator<T>>
 class matrix {
 public:
     // static matrix<T, ALLOC> load_from_binary(std::istream& in) {
@@ -192,6 +192,15 @@ public:
     // }
 
     using value_type = T;
+    using allocator_type = ALLOC;
+    using size_type = dsize2_t;
+    using reference = value_type&;
+    using const_reference = const value_type&;
+    using pointer = typename std::allocator_traits<ALLOC>::pointer;
+    using const_pointer = typename std::allocator_traits<ALLOC>::const_pointer;
+
+    using iterator = pointer;
+    using const_iterator = const_pointer;
 
     matrix()
         :matrix(dsize2_t{0, 0})
@@ -234,6 +243,31 @@ public:
     dsize_t area() const {
         return size_.area();
     }
+
+    const_iterator begin() const {
+        return data();
+    }
+
+    iterator begin() {
+        return data();
+    }
+
+    const_iterator end() const {
+        return data() + area();
+    }
+
+    iterator end() {
+        return data() + area();
+    }
+
+    reference operator[](size_type i) {
+        return data_[i.linear_idx(size_.x)];
+    }
+
+    const_reference operator[](size_type i) const {
+        return data_[i.linear_idx(size_.x)];
+    }
+
 private:
     dsize2_t size_;
 

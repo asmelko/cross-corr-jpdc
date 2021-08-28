@@ -121,8 +121,6 @@ As each thread in a warp will be processing a successive elements of the deforme
 we could do thread shuffle to reduce the accesses to global memory.
 
 
-
-
 TODO: Try using the whole warp for computation of a single shift
 */
 
