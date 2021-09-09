@@ -15,10 +15,10 @@
 
 namespace cross {
 
+using sw_clock = std::chrono::high_resolution_clock;
+
 template<typename MAT>
 class cross_corr_alg {
-private:
-    using sw_clock = std::chrono::high_resolution_clock;
 public:
     cross_corr_alg(bool is_fft, std::size_t num_measurements)
         :is_fft_(is_fft), sw_(num_measurements)
@@ -39,8 +39,6 @@ public:
         return sw_.results();
     }
 protected:
-
-
     template<typename PADDING>
     static MAT load_matrix_from_csv(const std::string& path) {
         std::ifstream file(path);
@@ -118,6 +116,82 @@ template<typename MAT, bool DEBUG>
 std::vector<std::string> naive_original_alg<MAT, DEBUG>::labels{
 
 };
+
+template<typename MAT, dsize_t THREADS_PER_BLOCK, bool DEBUG = false>
+class naive_ring_buffer_row_alg: public cross_corr_alg<MAT> {
+public:
+    naive_ring_buffer_row_alg()
+        :cross_corr_alg<MAT>(false, labels.size()), ref_(), target_(), res_()
+    {
+
+    }
+
+    void prepare(const std::string& ref_path, const std::string& target_path) override {
+        start_ = this->sw_.now();
+
+        ref_ = cross_corr_alg<MAT>::template load_matrix_from_csv<no_padding>(ref_path);
+        target_ = cross_corr_alg<MAT>::template load_matrix_from_csv<no_padding>(target_path);
+        res_ = MAT{ref_.size() + target_.size() - 1};
+
+        cuda_malloc(&d_ref_, ref_.area());
+        cuda_malloc(&d_target_, target_.area());
+        cuda_malloc(&d_res_, res_.area());
+
+        cuda_memcpy_to_device(d_ref_, ref_);
+        cuda_memcpy_to_device(d_target_, target_);
+    }
+
+    void run() override {
+        CUDA_MEASURE(1,
+            run_ccn_ring_buffer_row(
+                d_ref_,
+                d_target_,
+                d_res_,
+                target_.size(),
+                res_.size(),
+                THREADS_PER_BLOCK
+            )
+        );
+
+        CUCH(cudaDeviceSynchronize());
+        CUCH(cudaGetLastError());
+    }
+
+    void finalize() override {
+        cuda_memcpy_from_device(res_, d_res_);
+        this->sw_.cpu_manual_measure(0, start_);
+    }
+
+    const MAT& results() const override {
+        return res_;
+    }
+
+    const std::vector<std::string>& measurement_labels() const override {
+        return labels;
+    }
+
+private:
+
+    static std::vector<std::string> labels;
+
+    MAT ref_;
+    MAT target_;
+
+    MAT res_;
+
+    typename MAT::value_type* d_ref_;
+    typename MAT::value_type* d_target_;
+    typename MAT::value_type* d_res_;
+
+    sw_clock::time_point start_;
+};
+
+template<typename MAT, dsize_t THREADS_PER_BLOCK, bool DEBUG>
+std::vector<std::string> naive_ring_buffer_row_alg<MAT, THREADS_PER_BLOCK, DEBUG>::labels{
+    "Total",
+    "Kernel"
+};
+
 
 template<typename MAT, bool DEBUG = false>
 class fft_original_alg: public cross_corr_alg<MAT> {

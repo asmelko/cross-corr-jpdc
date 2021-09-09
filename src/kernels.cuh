@@ -25,4 +25,14 @@ void run_cross_corr_naive_original(
     dsize_t batch_size
 );
 
+template<typename T, typename RES>
+void run_ccn_ring_buffer_row(
+    const T* __restrict__ ref,
+    const T* __restrict__ deformed,
+    RES* __restrict__ out,
+    dsize2_t subregion_size,
+    dsize2_t search_size,
+    dsize_t threads_per_block
+);
+
 }

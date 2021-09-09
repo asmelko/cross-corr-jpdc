@@ -26,6 +26,6 @@ target_include_directories(cross PUBLIC ${Boost_INCLUDE_DIRS})
 target_link_libraries(cross PUBLIC ${Boost_LIBRARIES})
 target_link_libraries(cross PUBLIC ${CUDA_CUFFT_LIBRARIES})
 
-target_compile_options(cross PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-gencode arch=compute_70,code=[compute_70,sm_70,sm_75,sm_80]>)
-#target_compile_options(cross PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-gencode arch=compute_70,code=[compute_70,sm_70,sm_75,sm_80] -G -Xcompiler -rdynamic>)
+#target_compile_options(cross PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-gencode arch=compute_70,code=[compute_70,sm_70,sm_75,sm_80]>)
+target_compile_options(cross PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-gencode arch=compute_70,code=[compute_70,sm_70,sm_75,sm_80] -G -Xcompiler -rdynamic>)
 #target_compile_options(cross PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-g -rdynamic>)

@@ -46,7 +46,7 @@ def add_arguments(parser: argparse.ArgumentParser):
                                 type=OutputFormats,
                                 choices=list(OutputFormats),
                                 default=DEFAULT_OUTPUT_FORMAT,
-                                help=f"Output file format (defaults to {DEFAULT_OUTPUT_PATH})")
+                                help=f"Output file format (defaults to {DEFAULT_OUTPUT_FORMAT})")
     input_generate.add_argument("size",
                                 nargs=2,
                                 type=int,

@@ -38,12 +38,20 @@ public:
         cudaEventDestroy(start);
     }
 
+    typename CLOCK::time_point now() {
+        return CLOCK::now();
+    }
+
     void cpu_start() {
-        start_ = CLOCK::now();
+        start_ = now();
+    }
+
+    void cpu_manual_measure(std::size_t label, typename CLOCK::time_point start) {
+        measurements_[label] = CLOCK::now() - start;
     }
 
     void cpu_measure(std::size_t label) {
-        measurements_[label] = CLOCK::now() - start_;
+        cpu_manual_measure(label, start_);
     }
 
     void cuda_insert_start() {
