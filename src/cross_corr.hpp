@@ -24,9 +24,19 @@ public:
         :is_fft_(is_fft), sw_(num_measurements)
     {}
 
-    virtual void prepare(const std::string& ref_path, const std::string&) = 0;
-    virtual void run() = 0;
-    virtual void finalize() = 0;
+    void prepare(const std::filesystem::path& ref_path, const std::filesystem::path& def_path) {
+        start_ = sw_.now();
+        prepare_impl(ref_path, def_path);
+    }
+
+    void run() {
+        run_impl();
+    }
+
+    void finalize() {
+        finalize_impl();
+        sw_.cpu_manual_measure(0, start_);
+    }
 
     virtual const MAT& results() const = 0;
     virtual const std::vector<std::string>& measurement_labels() const = 0;
@@ -39,14 +49,21 @@ public:
         return sw_.results();
     }
 protected:
+
+    bool is_fft_;
+    StopWatch<sw_clock> sw_;
+
+    virtual void prepare_impl(const std::filesystem::path& ref_path, const std::filesystem::path& def_path) = 0;
+    virtual void run_impl() = 0;
+    virtual void finalize_impl() = 0;
+
     template<typename PADDING>
-    static MAT load_matrix_from_csv(const std::string& path) {
+    static MAT load_matrix_from_csv(const std::filesystem::path& path) {
         std::ifstream file(path);
         return MAT::template load_from_csv<PADDING>(file);
     }
 
-    bool is_fft_;
-    StopWatch<sw_clock> sw_;
+    sw_clock::time_point start_;
 };
 
 template<typename MAT, bool DEBUG = false>
@@ -58,7 +75,16 @@ public:
 
     }
 
-    void prepare(const std::string& ref_path, const std::string& target_path) override {
+    const MAT& results() const override {
+        return res_;
+    }
+
+    const std::vector<std::string>& measurement_labels() const override {
+        return labels;
+    }
+
+protected:
+    void prepare_impl(const std::filesystem::path& ref_path, const std::filesystem::path& target_path) override {
         ref_ = cross_corr_alg<MAT>::template load_matrix_from_csv<no_padding>(ref_path);
         target_ = cross_corr_alg<MAT>::template load_matrix_from_csv<no_padding>(target_path);
         res_ = MAT{ref_.size() + target_.size() - 1};
@@ -71,31 +97,25 @@ public:
         cuda_memcpy_to_device(d_target_, target_);
     }
 
-    void run() override {
-        run_cross_corr_naive_original<typename MAT::value_type, typename MAT::value_type>(
-            d_ref_,
-            d_target_,
-            d_res_,
-            target_.size(),
-            res_.size(),
-            1,
-            1
+    void run_impl() override {
+        CUDA_MEASURE(1,
+            run_cross_corr_naive_original(
+                d_ref_,
+                d_target_,
+                d_res_,
+                target_.size(),
+                res_.size(),
+                1,
+                1
+            )
         );
 
         CUCH(cudaDeviceSynchronize());
         CUCH(cudaGetLastError());
     }
 
-    void finalize() override {
+    void finalize_impl() override {
         cuda_memcpy_from_device(res_, d_res_);
-    }
-
-    const MAT& results() const override {
-        return res_;
-    }
-
-    const std::vector<std::string>& measurement_labels() const override {
-        return labels;
     }
 
 private:
@@ -114,7 +134,8 @@ private:
 
 template<typename MAT, bool DEBUG>
 std::vector<std::string> naive_original_alg<MAT, DEBUG>::labels{
-
+    "Total",
+    "Kernel"
 };
 
 template<typename MAT, dsize_t THREADS_PER_BLOCK, bool DEBUG = false>
@@ -126,9 +147,16 @@ public:
 
     }
 
-    void prepare(const std::string& ref_path, const std::string& target_path) override {
-        start_ = this->sw_.now();
+    const MAT& results() const override {
+        return res_;
+    }
 
+    const std::vector<std::string>& measurement_labels() const override {
+        return labels;
+    }
+
+protected:
+    void prepare_impl(const std::filesystem::path& ref_path, const std::filesystem::path& target_path) override {
         ref_ = cross_corr_alg<MAT>::template load_matrix_from_csv<no_padding>(ref_path);
         target_ = cross_corr_alg<MAT>::template load_matrix_from_csv<no_padding>(target_path);
         res_ = MAT{ref_.size() + target_.size() - 1};
@@ -141,7 +169,7 @@ public:
         cuda_memcpy_to_device(d_target_, target_);
     }
 
-    void run() override {
+    void run_impl() override {
         CUDA_MEASURE(1,
             run_ccn_ring_buffer_row(
                 d_ref_,
@@ -157,17 +185,8 @@ public:
         CUCH(cudaGetLastError());
     }
 
-    void finalize() override {
+    void finalize_impl() override {
         cuda_memcpy_from_device(res_, d_res_);
-        this->sw_.cpu_manual_measure(0, start_);
-    }
-
-    const MAT& results() const override {
-        return res_;
-    }
-
-    const std::vector<std::string>& measurement_labels() const override {
-        return labels;
     }
 
 private:
@@ -182,8 +201,6 @@ private:
     typename MAT::value_type* d_ref_;
     typename MAT::value_type* d_target_;
     typename MAT::value_type* d_res_;
-
-    sw_clock::time_point start_;
 };
 
 template<typename MAT, dsize_t THREADS_PER_BLOCK, bool DEBUG>
@@ -202,7 +219,16 @@ public:
 
     }
 
-    void prepare(const std::string& ref_path, const std::string& target_path) override {
+    const MAT& results() const override {
+        return res_;
+    }
+
+    const std::vector<std::string>& measurement_labels() const override {
+        return labels;
+    }
+
+protected:
+    void prepare_impl(const std::filesystem::path& ref_path, const std::filesystem::path& target_path) override {
 
         ref_ = cross_corr_alg<MAT>::template load_matrix_from_csv<relative_zero_padding<2>>(ref_path);
         target_ = cross_corr_alg<MAT>::template load_matrix_from_csv<relative_zero_padding<2>>(target_path);
@@ -235,7 +261,7 @@ public:
         FFTCH(cufftPlan2d(&fft_inv_plan_, ref_.size().y, ref_.size().x, fft_type_C2R<typename MAT::value_type>()));
     }
 
-    void run() override {
+    void run_impl() override {
         CPU_MEASURE(0,
             fft_real_to_complex(fft_plan_, d_ref_, d_ref_fft_);
             fft_real_to_complex(fft_plan_, d_target_, d_target_fft_);
@@ -284,17 +310,11 @@ public:
         CUCH(cudaGetLastError());
     }
 
-    void finalize() override {
+    void finalize_impl() override {
         cuda_memcpy_from_device(res_, d_res_);
     }
 
-    const MAT& results() const override {
-        return res_;
-    }
 
-    const std::vector<std::string>& measurement_labels() const override {
-        return labels;
-    }
 
 private:
     using fft_real_t = typename real_trait<typename MAT::value_type>::type;
@@ -322,6 +342,7 @@ private:
 
 template<typename MAT, bool DEBUG>
 std::vector<std::string> fft_original_alg<MAT, DEBUG>::labels{
+    "Total",
     "Forward FFT",
     "Hadamard",
     "Inverse FFT"

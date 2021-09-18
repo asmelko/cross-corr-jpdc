@@ -44,7 +44,7 @@ static typename MAT::value_type hadamard_and_sum(const MAT& ref, const MAT& targ
 
 template<typename MAT>
 MAT naive_cpu_cross_corr(const MAT& ref, const MAT& target, dsize2_t search_size) {
-    // TODO: Why is there a -1?
+
     MAT res{search_size};
 
     // TODO: Why is there a -1?
@@ -72,7 +72,7 @@ results validate_result(const MAT1& result, const MAT2& valid_result) {
         std::begin(valid_result),
         std::back_inserter(differences),
         [](typename MAT1::value_type a, typename MAT2::value_type b){
-            return (a - b) / b;
+            return a - b;
         });
 
     accs::accumulator_set<

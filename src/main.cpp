@@ -1,6 +1,8 @@
 #include <iostream>
 #include <fstream>
 #include <filesystem>
+#include <functional>
+#include <unordered_map>
 
 #include "validate.hpp"
 #include "matrix.hpp"
@@ -13,6 +15,9 @@ using namespace cross;
 
 using mat = matrix<float, pinned_allocator<float>>;
 using cpu_mat = matrix<float>;
+
+
+
 
 cpu_mat get_valid_results(
     const std::filesystem::path& in_ref,
@@ -63,49 +68,76 @@ void validate_results(
         stats = validate_result(res, valid_res);
     }
 
-    std::cout << "Percentage difference from valid values:" << "\n";
-    std::cout << "Mean: " << stats.diff_mean << "%\n";
-    std::cout << "Stddev: " << stats.diff_std_dev << "%\n";
+    std::cout << "Difference from valid values:" << "\n";
+    std::cout << "Mean: " << stats.diff_mean << "\n";
+    std::cout << "Stddev: " << stats.diff_std_dev << "\n";
 
     std::ofstream out_file(res_out);
     res.store_to_csv(out_file);
 }
 
+template<typename ALG>
+void run_measurement(
+    const std::filesystem::path& ref_path,
+    const std::filesystem::path& def_path,
+    const std::filesystem::path& out_path,
+    const std::filesystem::path& measurements_path
+) {
+    ALG alg;
+    std::cerr << "Loading inputs\n";
+    alg.prepare(ref_path, def_path);
+
+    std::cerr << "Running test alg\n";
+    alg.run();
+
+    std::cerr << "Copying output data to host\n";
+    alg.finalize();
+
+    // DEBUG
+    auto res = alg.results();
+    std::ofstream out_file(out_path);
+    res.store_to_csv(out_file);
+
+    std::cerr << "Validating results\n";
+    validate_results(ref_path, def_path, out_path, alg);
+
+
+    std::ofstream measurements_file(measurements_path);
+    auto labels = alg.measurement_labels();
+    auto measurements = alg.measurements();
+    to_csv(measurements_file, labels);
+    to_csv<std::chrono::nanoseconds>(measurements_file, measurements);
+}
+
+static std::unordered_map<std::string, std::function<void(
+    const std::filesystem::path&,
+    const std::filesystem::path&,
+    const std::filesystem::path&,
+    const std::filesystem::path&
+)>> algorithms{
+    {"nai_orig", run_measurement<naive_original_alg<mat>>},
+    {"nai_rows_128", run_measurement<naive_ring_buffer_row_alg<mat, 128>>},
+    {"nai_rows_256", run_measurement<naive_ring_buffer_row_alg<mat, 256>>},
+    {"fft_orig", run_measurement<fft_original_alg<mat>>}
+};
+
 int main(int argc, char **argv) {
     // TODO: Better argument parsing
-    if (argc != 5) {
-        std::cerr << "Invalid number of arguments, expected " << 5 << " , got " << argc - 1 << "\n";
-        std::cerr << "Usage: " << argv[0] << " <ref_path> <target_path> <out_path> <measurements_path>\n";
+    if (argc != 6) {
+        std::cerr << "Invalid number of arguments, expected " << 6 << " , got " << argc - 1 << "\n";
+        std::cerr << "Usage: " << argv[0] << "<alg> <ref_path> <target_path> <out_path> <measurements_path>\n";
         return 1;
     }
     try {
-        //naive_original_alg<mat> alg;
-        //fft_original_alg<mat, true> alg;
-        naive_ring_buffer_row_alg<mat, 256, true> alg;
+        auto fnc = algorithms.find(argv[1]);
+        if (fnc == algorithms.end()) {
+            // TODO: List of available algorithms
+            std::cerr << "Unknown algorithm \"" << argv[1] << "\", expected one of " << std::endl;
+            return 1;
+        }
 
-        std::cerr << "Loading inputs\n";
-        alg.prepare(argv[1], argv[2]);
-
-        std::cerr << "Running test alg\n";
-        alg.run();
-
-        std::cerr << "Copying output data to host\n";
-        alg.finalize();
-
-        // DEBUG
-        // auto res = alg.results();
-        // std::ofstream out_file(argv[3]);
-        // res.store_to_csv(out_file);
-
-        std::cerr << "Validating results\n";
-        validate_results(argv[1], argv[2], argv[3], alg);
-
-
-        std::ofstream measurements_file(argv[4]);
-        auto labels = alg.measurement_labels();
-        auto measurements = alg.measurements();
-        to_csv(measurements_file, labels);
-        to_csv<std::chrono::nanoseconds>(measurements_file, measurements);
+        fnc->second(argv[2], argv[3], argv[4], argv[5]);
+        return 0;
     }
     catch (std::exception& e) {
         std::cerr << "Exception occured: " << e.what() << std::endl;

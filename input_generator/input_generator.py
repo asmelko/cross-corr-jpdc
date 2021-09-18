@@ -24,12 +24,12 @@ def generate(size: Tuple[int, int], format: OutputFormats, output_path: Path):
     if format == OutputFormats.CSV:
         print(f"Saving data to {str(output_path)}")
         with output_path.open(mode='w') as f:
-            f.write(f'{size[0]},{size[1]}\n')
+            f.write(f'{size[1]},{size[0]}\n')
             np.savetxt(f, vals, delimiter=',')
 
 
 def _generate(args: argparse.Namespace):
-    generate(tuple(args.size), args.format, args.output_path.absolute())
+    generate([args.rows, args.columns], args.format, args.output_path.absolute())
 
 
 def add_arguments(parser: argparse.ArgumentParser):
@@ -47,10 +47,12 @@ def add_arguments(parser: argparse.ArgumentParser):
                                 choices=list(OutputFormats),
                                 default=DEFAULT_OUTPUT_FORMAT,
                                 help=f"Output file format (defaults to {DEFAULT_OUTPUT_FORMAT})")
-    input_generate.add_argument("size",
-                                nargs=2,
+    input_generate.add_argument("columns",
                                 type=int,
-                                help=f"Size of the generated matrix")
+                                help=f"Number of columns of the generated matrix")
+    input_generate.add_argument("rows",
+                                type=int,
+                                help=f"Number of rows of the generated matrix")
     input_generate.set_defaults(action=_generate)
 
 
