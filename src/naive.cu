@@ -367,6 +367,11 @@ public:
 
         tail_ = (tail_ + load_size) % buffer_.size();
         tail_src_offset_ += load_size;
+
+        // if ((ctb.group_index().x == 2 || ctb.group_index().x == 1) && ctb.group_index().y == 0 && ctb.thread_rank() == 0) {
+        //     printf("Block: %u, Src: [%u, %u], Size: %u, Tail: %u, Src offset: %u\n", ctb.group_index().x, src_.start_offset(), src_.size(), load_size, tail_, tail_src_offset_);
+        // }
+
         return load_size;
     }
 
@@ -671,7 +676,7 @@ __global__ void ccn_ring_buffer_row(
         // any shifted_. indicies should be valid
         int def_y = ref_slice_block.begin_y_src_idx() + row - shift.y;
         row_slice<T> def_row = def_mat.row(def_y);
-
+        // TODO: Most things are shared between rows, so no need to recompute them each time
         row_ring_buffer<T, 2> ref_buffer{
             ctb,
             ref_slice_block.row(row),
@@ -690,20 +695,35 @@ __global__ void ccn_ring_buffer_row(
             ),
             def_s
         };
+
+        // Relative offsets of the two buffers stay the same during the whole row processing
+        int def_buffer_thread_offset = (int)ref_buffer.start_offset() - (int)def_buffer.start_offset() - shift.x;
         do {
             // Sync after load
             ctb.sync();
 
             // Indicies in the ref_s buffer which should be processed by the current thread
             dsize_t ref_buffer_thread_start = max((int)ref_slice.begin_x_src_idx() - (int)ref_buffer.start_offset(), 0);
-            dsize_t ref_buffer_thread_end = min((int)ref_slice.end_x_src_idx() - (int)ref_buffer.start_offset(), ref_buffer.num_loaded());
+            dsize_t ref_buffer_thread_end = min(
+                (int)ref_slice.end_x_src_idx() - (int)ref_buffer.start_offset(),
+                min(
+                    ref_buffer.num_loaded(),
+                    (int)def_buffer.num_loaded() - ((int)ref_buffer_thread_start + (int)def_buffer_thread_offset)
+                )
+            );
 
-            int def_buffer_thread_offset = (int)ref_buffer.start_offset() - (int)def_buffer.start_offset() - shift.x;
+
+
+            // if (ctb.group_index().y == 0 && ctb.thread_rank() == 0) {
+            //     printf("Block: %u, Shift: %d, Start: %u, End: %u, Offset: %d, Ref start: %u, Def start: %u\n", ctb.group_index().x,  shift.x, ref_buffer_thread_start, ref_buffer_thread_end, def_buffer_thread_offset, ref_buffer.start_offset(), def_buffer.start_offset());
+            // }
 
             for (dsize_t ref_buffer_index = ref_buffer_thread_start; ref_buffer_index < ref_buffer_thread_end; ++ref_buffer_index) {
 
                 sum += ref_buffer[ref_buffer_index] * def_buffer[(int)ref_buffer_index + def_buffer_thread_offset];
             }
+
+
 
             // Sync after computation
             ctb.sync();
