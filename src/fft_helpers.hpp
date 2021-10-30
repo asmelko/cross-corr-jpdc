@@ -188,9 +188,7 @@ void copy_quadrant(const MAT_IN& src, MAT_OUT& tgt, dsize2_t src_pos, dsize2_t s
 }
 
 template<typename MAT_IN, typename MAT_OUT>
-MAT_OUT normalize_fft_results(const MAT_IN& res) {
-    MAT_OUT norm{res.size() - 1};
-
+void normalize_fft_results(const MAT_IN& res, MAT_OUT &&norm) {
     // We need to swap top left with bottom right and top right with bottom left quadrants
     // We also need to remove "empty" row and column both at res.size() / 2,
     // which split the res matrix into the afforementioned quadrants
@@ -199,7 +197,7 @@ MAT_OUT normalize_fft_results(const MAT_IN& res) {
     // and we need to put them into a 19x19 matrix
     // It fits, as both 19*19 = 361 = 10*10 + 9*10 + 10*9 + 9*9
 
-    // For odd sized matricies, the empty row and column should also be at floor(res.size() / 2)
+    // For odd sized matrices, the empty row and column should also be at floor(res.size() / 2)
     // so for 19x19, they should be at index 9 and all quadrants should be the same 9x9
 
     // We also need to normalize the results, as cuFFT computes unnormalized FFT, so every
@@ -235,6 +233,22 @@ MAT_OUT normalize_fft_results(const MAT_IN& res) {
         dsize2_t{res.size().x - empty_x - 1, res.size().y - empty_y - 1},
         dsize2_t{0, 0}
     );
+}
+
+template<typename T, typename ALLOC>
+data_single<T> normalize_fft_results(const data_single<T, ALLOC>& res) {
+    data_single<T> norm{res.matrix_size() - 1};
+    normalize_fft_results(res.view(), norm.view());
+    return norm;
+}
+
+template<typename T, typename ALLOC>
+data_array<T> normalize_fft_results(const data_array<T, ALLOC>& res) {
+    data_array<T> norm{res.num_matrices(), res.matrix_size() - 1};
+    for (auto i = 0; i < norm.num_matrices(); ++i) {
+        // TOOD: In parallel
+        normalize_fft_results(res.view(i), norm.view(i));
+    }
 
     return norm;
 }

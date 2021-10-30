@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "input_generator"
 version = "0.1.0"
-description = "Tool for generating random matricies and writing them out into a different file formats"
+description = "Tool for generating random matrices and writing them out into a different file formats"
 authors = ["Karel Madera <karelmad@email.cz>"]
 
 [tool.poetry.dependencies]

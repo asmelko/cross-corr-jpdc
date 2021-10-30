@@ -42,10 +42,10 @@ static typename MAT::value_type hadamard_and_sum(const MAT& ref, const MAT& targ
     return sum;
 }
 
-template<typename MAT>
-MAT naive_cpu_cross_corr(const MAT& ref, const MAT& target, dsize2_t search_size) {
 
-    MAT res{search_size};
+template<typename MAT>
+void naive_cpu_cross_corr(const MAT& ref, const MAT& target, MAT&& res) {
+    auto search_size = res.size();
 
     // TODO: Why is there a -1?
     dsize2_t half_size = (search_size - 1) / 2;
@@ -58,9 +58,17 @@ MAT naive_cpu_cross_corr(const MAT& ref, const MAT& target, dsize2_t search_size
             res.data()[res_offset] = hadamard_and_sum(ref, target, x, y);
         }
     }
+}
 
+template<typename MAT>
+data_single<typename MAT::value_type> naive_cpu_cross_corr(const MAT& ref, const MAT& target, dsize2_t search_size) {
+
+    data_single<typename MAT::value_type> res{search_size};
+    naive_cpu_cross_corr(ref, target, res.view());
     return res;
 }
+
+
 
 template<typename MAT1, typename MAT2>
 results validate_result(const MAT1& result, const MAT2& valid_result) {

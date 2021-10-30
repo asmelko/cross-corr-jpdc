@@ -63,9 +63,9 @@ void cuda_memcpy_to_device(T* dst, T* src, dsize_t num) {
 	CUCH(cudaMemcpy(dst, src, num * sizeof(T), cudaMemcpyHostToDevice));
 }
 
-template<typename MAT>
-void cuda_memcpy_to_device(typename MAT::value_type* dst, MAT& src) {
-	cuda_memcpy_to_device(dst, src.data(), src.area());
+template<typename DATA>
+void cuda_memcpy_to_device(typename DATA::value_type* dst, DATA& src) {
+	cuda_memcpy_to_device(dst, src.data(), src.size());
 }
 
 
@@ -74,9 +74,9 @@ void cuda_memcpy_from_device(T* dst, T* src, dsize_t num) {
 	CUCH(cudaMemcpy(dst, src, num * sizeof(T), cudaMemcpyDeviceToHost));
 }
 
-template<typename MAT>
-void cuda_memcpy_from_device(MAT& dst, typename MAT::value_type* src) {
-	cuda_memcpy_from_device(dst.data(), src, dst.area());
+template<typename DATA>
+void cuda_memcpy_from_device(DATA& dst, typename DATA::value_type* src) {
+	cuda_memcpy_from_device(dst.data(), src, dst.size());
 }
 
 template<typename T>

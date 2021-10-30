@@ -106,6 +106,12 @@ inline bool operator==(const vec2<T> & lhs, const vec2<T> & rhs)
 	return lhs.x == rhs.x && lhs.y == rhs.y;
 }
 
+template<typename T>
+inline bool operator!=(const vec2<T> & lhs, const vec2<T> & rhs)
+{
+	return !(lhs == rhs);
+}
+
 
 using dsize2_t = vec2<unsigned int>;
 using dpos2_t = vec2<unsigned int>;

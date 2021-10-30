@@ -34,7 +34,7 @@ void to_csv(std::ostream& out, const std::vector<std::chrono::duration<REP, PERI
 }
 
 template<typename T, typename ALLOC>
-void to_csv(std::ostream& out, const matrix<T, ALLOC>& matrix) {
+void to_csv(std::ostream& out, const data_single<T, ALLOC>& matrix) {
     matrix.store_to_csv(out);
 }
 
