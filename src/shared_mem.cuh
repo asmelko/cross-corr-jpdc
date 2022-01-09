@@ -63,7 +63,7 @@ public:
     //     return copy_size;
     // }
 
-    __device__ size_type load(cg::thread_block ctb, T* src, dsize_t size, dsize_t offset = 0) {
+    __device__ size_type load(cg::thread_block ctb, const T* src, dsize_t size, dsize_t offset = 0) {
         // TODO: Asserts
         size_type copy_size = min(size, size_ - offset);
         auto data = data_ + offset;

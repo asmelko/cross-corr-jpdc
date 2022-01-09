@@ -1,5 +1,6 @@
 #pragma once
 
+#include <utility>
 #include <cuda_runtime.h>
 
 namespace cross {
@@ -14,6 +15,34 @@ struct vec2
 {
 	T x;
 	T y;
+
+
+	__host__ __device__ vec2()
+		:vec2<T>(0,0)
+	{
+
+	}
+
+	__host__ __device__ vec2(T x, T y)
+		:x(std::move(x)), y(std::move(y))
+	{
+
+	}
+
+	template<typename U>
+	__host__ __device__ vec2(const vec2<U>& v)
+		:x(v.x), y(v.y)
+	{
+
+	}
+
+	template<typename U>
+	__host__ __device__ vec2(vec2<U>&& v)
+		:x(std::move(v.x)), y(std::move(v.y))
+	{
+
+	}
+
 	__host__ __device__ T area() const { return x * y; }
 
 	__host__ __device__ vec2<T> operator+(const vec2<T>& rhs) const

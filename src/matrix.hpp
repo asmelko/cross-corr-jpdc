@@ -260,53 +260,6 @@ private:
     pointer data_;
 };
 
-template<typename T>
-class const_matrix_view {
-public:
-    using value_type = T;
-    using size_type = dsize2_t;
-    using reference = value_type&;
-    using const_reference = const value_type&;
-    using pointer = value_type*;
-    using const_pointer = const value_type*;
-
-    using iterator = pointer;
-    using const_iterator = const_pointer;
-
-    const_matrix_view(dsize2_t size, const_pointer data)
-        :size_(size), data_(data)
-    { }
-
-    const_pointer data() const {
-        return data_;
-    }
-
-    dsize2_t size() const {
-        return size_;
-    }
-
-    dsize_t area() const {
-        return size_.area();
-    }
-
-    const_iterator begin() const {
-        return data();
-    }
-
-    const_iterator end() const {
-        return data() + area();
-    }
-
-    const_reference operator[](size_type i) const {
-        return data_[i.linear_idx(size_.x)];
-    }
-
-private:
-    dsize2_t size_;
-
-    const_pointer data_;
-};
-
 template<typename T, typename ALLOC = std::allocator<T>>
 class data_single {
 public:
@@ -397,8 +350,8 @@ public:
         };
     }
 
-    const_matrix_view<T> view() const {
-        return const_matrix_view<T>{
+    matrix_view<const T> view() const {
+        return matrix_view<const T>{
             size_,
             data_.data()
         };
@@ -558,8 +511,8 @@ public:
         };
     }
 
-    const_matrix_view<T> view(dsize_t matrix_index) const {
-        return const_matrix_view<T>{
+    matrix_view<const T> view(dsize_t matrix_index) const {
+        return matrix_view<const T>{
             matrix_size_,
             data_.data() + matrix_size_.area() * matrix_index
         };

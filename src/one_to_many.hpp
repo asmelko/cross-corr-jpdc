@@ -36,7 +36,92 @@ protected:
 };
 
 
+template<typename T, bool DEBUG = false, typename ALLOC = std::allocator<T>>
+class naive_original_alg: public one_to_many<T, ALLOC> {
+public:
+    naive_original_alg()
+        :one_to_many<T, ALLOC>(false, labels.size()), ref_(), targets_(), results_()
+    {
 
+    }
+
+    const data_array<T, ALLOC>& results() const override {
+        return results_;
+    }
+
+    const std::vector<std::string>& measurement_labels() const override {
+        return labels;
+    }
+
+protected:
+    void prepare_impl(const std::filesystem::path& ref_path, const std::vector<std::filesystem::path>& def_paths) override {
+        prepare_impl_common(
+            one_to_many<T, ALLOC>::template load_matrix_from_csv_single<no_padding>(ref_path),
+            one_to_many<T, ALLOC>::template load_matrix_array_from_csv<no_padding>(def_paths)
+        );
+    }
+
+    void prepare_impl(const std::filesystem::path& ref_path, const std::filesystem::path& def_path) override {
+        prepare_impl_common(
+            one_to_many<T, ALLOC>::template load_matrix_from_csv_single<no_padding>(ref_path),
+            one_to_many<T, ALLOC>::template load_matrix_array_from_csv<no_padding>(def_path)
+        );
+    }
+
+    void run_impl() override {
+        CUDA_MEASURE(1,
+            run_cross_corr_naive_original(
+                d_ref_,
+                d_targets_,
+                d_results_,
+                targets_.matrix_size(),
+                results_.matrix_size(),
+                1,
+                targets_.num_matrices()
+            )
+        );
+
+        CUCH(cudaDeviceSynchronize());
+        CUCH(cudaGetLastError());
+    }
+
+    void finalize_impl() override {
+        cuda_memcpy_from_device(results_, d_results_);
+    }
+
+private:
+
+    static std::vector<std::string> labels;
+
+    data_single<T, ALLOC> ref_;
+    data_array<T, ALLOC> targets_;
+
+    data_array<T, ALLOC> results_;
+
+    T* d_ref_;
+    T* d_targets_;
+    T* d_results_;
+
+    void prepare_impl_common(data_single<T, ALLOC> &&ref, data_array<T, ALLOC> &&targets) {
+        ref_ = std::move(ref);
+        targets_ = std::move(targets);
+        auto result_matrix_size = ref_.matrix_size() + targets_.matrix_size() - 1;
+        results_ = data_array<T, ALLOC>{targets_.num_matrices(), result_matrix_size};
+
+        cuda_malloc(&d_ref_, ref_.size());
+        cuda_malloc(&d_targets_, targets_.size());
+        cuda_malloc(&d_results_, results_.size());
+
+        cuda_memcpy_to_device(d_ref_, ref_);
+        cuda_memcpy_to_device(d_targets_, targets_);
+    }
+};
+
+template<typename T, bool DEBUG, typename ALLOC>
+std::vector<std::string> naive_original_alg<T, DEBUG, ALLOC>::labels{
+    "Total",
+    "Kernel"
+};
 
 template<typename T, dsize_t THREADS_PER_BLOCK, bool DEBUG = false, typename ALLOC = std::allocator<T>>
 class naive_def_per_block: public one_to_many<T, ALLOC> {
@@ -78,8 +163,8 @@ protected:
         CUDA_MEASURE(1,
             run_ccn_def_per_block(
                 d_ref_,
-                d_target_,
-                d_res_,
+                d_targets_,
+                d_results_,
                 ref_.matrix_size(),
                 results_.matrix_size(),
                 targets_.num_matrices(),
@@ -93,7 +178,7 @@ protected:
     }
 
     void finalize_impl() override {
-        cuda_memcpy_from_device(results_, d_res_);
+        cuda_memcpy_from_device(results_, d_results_);
     }
 
 private:
@@ -106,8 +191,8 @@ private:
     data_array<T, ALLOC> results_;
 
     T* d_ref_;
-    T* d_target_;
-    T* d_res_;
+    T* d_targets_;
+    T* d_results_;
 
     void prepare_impl_common(data_single<T, ALLOC> &&ref, data_array<T, ALLOC> &&targets) {
         ref_ = std::move(ref);
@@ -116,11 +201,11 @@ private:
         results_ = data_array<T, ALLOC>{targets_.num_matrices(), result_matrix_size};
 
         cuda_malloc(&d_ref_, ref_.size());
-        cuda_malloc(&d_target_, targets_.size());
-        cuda_malloc(&d_res_, results_.size());
+        cuda_malloc(&d_targets_, targets_.size());
+        cuda_malloc(&d_results_, results_.size());
 
         cuda_memcpy_to_device(d_ref_, ref_);
-        cuda_memcpy_to_device(d_target_, targets_);
+        cuda_memcpy_to_device(d_targets_, targets_);
     }
 };
 
