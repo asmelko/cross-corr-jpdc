@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iterator>
 #include <vector>
 #include <algorithm>
 #include <iostream>
@@ -197,8 +198,9 @@ namespace impl {
     }
 }
 
+
 template<typename T>
-class matrix_view {
+class submatrix_view {
 public:
     using value_type = T;
     using size_type = dsize2_t;
@@ -207,20 +209,94 @@ public:
     using pointer = value_type*;
     using const_pointer = const value_type*;
 
-    using iterator = pointer;
-    using const_iterator = const_pointer;
+    template<typename VAL>
+    class iter {
+    public:
+        using difference_type = ddiff_t;
+        using value_type = VAL;
+        using pointer = VAL*;
+        using reference = VAL&;
+        using iterator_category = std::random_access_iterator_tag;
 
-    matrix_view(dsize2_t size, pointer data)
-        :size_(size), data_(data)
+
+        explicit iter(submatrix_view<T>& src) : src_(src), pos_(0,0) {}
+
+        inline iter& operator+=(difference_type rhs) {
+            pos_ = shift_pos(pos_, rhs, src_.size().x);
+            return *this;
+        }
+        inline iter& operator-=(difference_type rhs) {
+            pos_ = shift_pos(pos_, -rhs, src_.size().x);
+            return *this;
+        }
+        inline value_type& operator*() const {return src_[pos_];}
+        inline value_type* operator->() const {return &src_[pos_];}
+        inline value_type& operator[](difference_type rhs) const {return src_[shift_pos(pos_, rhs, src_.size().x)];}
+
+        inline iter& operator++() {pos_ = shift_pos(pos_, 1, src_.size().x); return *this;}
+        inline iter& operator--() {pos_ = shift_pos(pos_, -1, src_.size().x); return *this;}
+        inline iter operator++(int) const {iter tmp(*this); ++(*this); return tmp;}
+        inline iter operator--(int) const {iter tmp(*this); --(*this); return tmp;}
+
+        inline difference_type operator-(const iter& rhs) const {
+            auto x_diff = (difference_type)pos_.x - (difference_type)rhs.pos_.x;
+            auto y_diff = (difference_type)pos_.y - (difference_type)rhs.pos_.y;
+            return y_diff * (difference_type)src_.size().x + x_diff;
+        }
+        inline iter operator+(difference_type rhs) const {
+            iter tmp(*this);
+            tmp += rhs;
+            return tmp;
+        }
+        inline iter operator-(difference_type rhs) const {
+            iter tmp(*this);
+            tmp -= rhs;
+            return tmp;
+        }
+
+        inline bool operator==(const iter& rhs) const {return pos_ == rhs.pos_;}
+        inline bool operator!=(const iter& rhs) const {return pos_ != rhs.pos_;}
+        inline bool operator>(const iter& rhs) const {
+            return pos_.y > rhs.pos_.y || (pos_.y == rhs.pos_.y && pos_.x > rhs.pos_.x);
+        }
+        inline bool operator<(const iter& rhs) const {
+            return !(*this > rhs) && !(*this == rhs);
+        }
+        inline bool operator>=(const iter& rhs) const {
+            return !(*this < rhs);
+        }
+        inline bool operator<=(const iter& rhs) const {
+            return !(*this > rhs);
+        }
+    private:
+        static inline dsize2_t shift_pos(dsize2_t pos, difference_type shift, dsize_t row_size) {
+            auto x = (difference_type)pos.x + shift;
+
+            pos.y += x / (difference_type)row_size;
+
+            auto x_shifted = x % (difference_type)row_size;
+            pos.x = x_shifted >= 0 ? x_shifted : row_size + x_shifted;
+            return pos;
+        }
+
+        submatrix_view<T>& src_;
+        dsize2_t pos_;
+    };
+
+    using iterator = iter<value_type>;
+    using const_iterator = iter<const value_type>;
+
+    static submatrix_view<T> from_positions(size_type top_left, size_type bottom_right, dsize_t src_row_size, T* src_data) {
+        return submatrix_view<T>{top_left, bottom_right - top_left, src_row_size, src_data};
+    }
+
+    static submatrix_view<T> from_position_size(dsize2_t top_left, dsize2_t size, dsize_t src_row_size, T* src_data) {
+        return submatrix_view<T>{top_left, size, src_row_size, src_data};
+    }
+
+    submatrix_view(dsize2_t top_left, dsize2_t size, dsize_t src_row_size, pointer src_data)
+        :top_left_(top_left), size_(size), src_row_size_(src_row_size), src_data_(src_data)
     { }
-
-    pointer data() {
-        return data_;
-    }
-
-    const_pointer data() const {
-        return data_;
-    }
 
     dsize2_t size() const {
         return size_;
@@ -228,6 +304,84 @@ public:
 
     dsize_t area() const {
         return size_.area();
+    }
+
+    const_iterator begin() const {
+        return iterator(*this);
+    }
+
+    iterator begin() {
+        return iterator(*this);
+    }
+
+    const_iterator end() const {
+        return iterator(*this) + area();
+    }
+
+    iterator end() {
+        return iterator(*this) + area();
+    }
+
+    reference operator [](dsize2_t i) {
+        return src_data_[(top_left_.y + i.y) * src_row_size_ + top_left_.x + i.x];
+    }
+
+    const_reference operator [](dsize2_t i) const {
+        return src_data_[(top_left_.y + i.y) * src_row_size_ + top_left_.x + i.x];
+    }
+
+    submatrix_view<T> submatrix_from_positions(
+        dsize2_t top_left,
+        dsize2_t bottom_right
+    ) const {
+        return submatrix_view<T>::from_positions(
+            top_left_ + top_left,
+            top_left_ + bottom_right,
+            src_row_size_,
+            src_data_
+        );
+    }
+
+    submatrix_view<T> submatrix_from_position_size(
+        dsize2_t top_left,
+        dsize2_t size
+    ) const {
+        return submatrix_view<T>::from_position_size(
+            top_left_ + top_left,
+            size,
+            src_row_size_,
+            src_data_
+        );
+    }
+protected:
+    dsize2_t top_left_;
+    dsize2_t size_;
+    dsize_t src_row_size_;
+    pointer src_data_;
+};
+
+template<typename T>
+class matrix_view: public submatrix_view<T> {
+public:
+    using value_type = T;
+    using size_type = dsize2_t;
+    using reference = value_type&;
+    using const_reference = const value_type&;
+    using pointer = value_type*;
+    using const_pointer = const value_type*;
+    using iterator = pointer;
+    using const_iterator = const_pointer;
+
+    matrix_view(dsize2_t size, pointer data)
+        :submatrix_view<T>(dsize2_t(0,0), size, size.x, data)
+    { }
+
+    pointer data() {
+        return this->src_data_;
+    }
+
+    const_pointer data() const {
+        return this->src_data_;
     }
 
     const_iterator begin() const {
@@ -239,25 +393,12 @@ public:
     }
 
     const_iterator end() const {
-        return data() + area();
+        return data() + this->area();
     }
 
     iterator end() {
-        return data() + area();
+        return data() + this->area();
     }
-
-    reference operator[](size_type i) {
-        return data_[i.linear_idx(size_.x)];
-    }
-
-    const_reference operator[](size_type i) const {
-        return data_[i.linear_idx(size_.x)];
-    }
-
-private:
-    dsize2_t size_;
-
-    pointer data_;
 };
 
 template<typename T, typename ALLOC = std::allocator<T>>

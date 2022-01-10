@@ -23,9 +23,26 @@ public:
         this->start_timer();
         prepare_impl(ref_path, def_path);
     }
+
+    validation_results validate_impl(const std::optional<std::filesystem::path>& valid_data) override {
+        if (valid_data.has_value()) {
+            auto val = validate_with_precomputed(
+                load_matrix_from_csv_single<T, no_padding>(*valid_data)
+            );
+            return val.validate(results(), this->is_fft());
+        } else {
+            auto val = validate_with_computed_one_to_one(get_ref(), get_target());
+            return val.validate(results(), this->is_fft());
+        }
+        return validation_results{};
+    }
+
     virtual const data_single<T, ALLOC>& results() const = 0;
 protected:
     virtual void prepare_impl(const std::filesystem::path& ref_path, const std::filesystem::path& def_path) = 0;
+
+    virtual const data_single<T, ALLOC>& get_ref() const = 0;
+    virtual const data_single<T, ALLOC>& get_target() const = 0;
 };
 
 
@@ -48,8 +65,8 @@ public:
 
 protected:
     void prepare_impl(const std::filesystem::path& ref_path, const std::filesystem::path& target_path) override {
-        ref_ = this->template load_matrix_from_csv_single<no_padding>(ref_path);
-        target_ = this->template load_matrix_from_csv_single<no_padding>(target_path);
+        ref_ = load_matrix_from_csv_single<T, no_padding, ALLOC>(ref_path);
+        target_ = load_matrix_from_csv_single<T, no_padding, ALLOC>(target_path);
         res_ = data_single<T, ALLOC>{ref_.matrix_size() + target_.matrix_size() - 1};
 
         cuda_malloc(&d_ref_, ref_.size());
@@ -78,6 +95,13 @@ protected:
 
     void finalize_impl() override {
         cuda_memcpy_from_device(res_, d_res_);
+    }
+
+    const data_single<T, ALLOC>& get_ref() const override {
+        return ref_;
+    }
+    const data_single<T, ALLOC>& get_target() const {
+        return target_;
     }
 
 private:
@@ -121,8 +145,8 @@ public:
 protected:
     void prepare_impl(const std::filesystem::path& ref_path, const std::filesystem::path& target_path) override {
 
-        ref_ = this->template load_matrix_from_csv_single<relative_zero_padding<2>>(ref_path);
-        target_ = this->template load_matrix_from_csv_single<relative_zero_padding<2>>(target_path);
+        ref_ = load_matrix_from_csv_single<T, relative_zero_padding<2>, ALLOC>(ref_path);
+        target_ = load_matrix_from_csv_single<T, relative_zero_padding<2>, ALLOC>(target_path);
 
         if (DEBUG)
         {
@@ -205,6 +229,12 @@ protected:
         cuda_memcpy_from_device(res_, d_res_);
     }
 
+    const data_single<T, ALLOC>& get_ref() const override {
+        return ref_;
+    }
+    const data_single<T, ALLOC>& get_target() const {
+        return target_;
+    }
 
 
 private:

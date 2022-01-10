@@ -6,6 +6,7 @@
 namespace cross {
 
 using dsize_t = unsigned int;
+using ddiff_t = int;
 using dpos_t = unsigned int;
 
 // Represents a two-dimensional vector, used to pass positions and sizes around.
@@ -143,6 +144,7 @@ inline bool operator!=(const vec2<T> & lhs, const vec2<T> & rhs)
 
 
 using dsize2_t = vec2<unsigned int>;
+using ddiff2_t = vec2<int>;
 using dpos2_t = vec2<unsigned int>;
 
 }

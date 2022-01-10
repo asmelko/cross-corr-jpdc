@@ -29,10 +29,26 @@ public:
         prepare_impl(ref_path, def_path);
     }
 
+    validation_results validate_impl(const std::optional<std::filesystem::path>& valid_data) override {
+        if (valid_data.has_value()) {
+            auto val = validate_with_precomputed(
+                load_matrix_array_from_csv<T, no_padding>(*valid_data)
+            );
+            return val.validate(results(), this->is_fft());
+        } else {
+            auto val = validate_with_computed_one_to_many(get_ref(), get_targets());
+            return val.validate(results(), this->is_fft());
+        }
+        return validation_results{};
+    }
+
     virtual const data_array<T, ALLOC>& results() const = 0;
 protected:
     virtual void prepare_impl(const std::filesystem::path& ref_path, const std::vector<std::filesystem::path>& def_paths) = 0;
     virtual void prepare_impl(const std::filesystem::path& ref_path, const std::filesystem::path& def_path) = 0;
+
+    virtual const data_single<T, ALLOC>& get_ref() const = 0;
+    virtual const data_array<T, ALLOC>& get_targets() const = 0;
 };
 
 
@@ -56,15 +72,15 @@ public:
 protected:
     void prepare_impl(const std::filesystem::path& ref_path, const std::vector<std::filesystem::path>& def_paths) override {
         prepare_impl_common(
-            one_to_many<T, ALLOC>::template load_matrix_from_csv_single<no_padding>(ref_path),
-            one_to_many<T, ALLOC>::template load_matrix_array_from_csv<no_padding>(def_paths)
+            load_matrix_from_csv_single<T, no_padding, ALLOC>(ref_path),
+            load_matrix_array_from_csv<T, no_padding, ALLOC>(def_paths)
         );
     }
 
     void prepare_impl(const std::filesystem::path& ref_path, const std::filesystem::path& def_path) override {
         prepare_impl_common(
-            one_to_many<T, ALLOC>::template load_matrix_from_csv_single<no_padding>(ref_path),
-            one_to_many<T, ALLOC>::template load_matrix_array_from_csv<no_padding>(def_path)
+            load_matrix_from_csv_single<T, no_padding, ALLOC>(ref_path),
+            load_matrix_array_from_csv<T, no_padding, ALLOC>(def_path)
         );
     }
 
@@ -89,6 +105,13 @@ protected:
         cuda_memcpy_from_device(results_, d_results_);
     }
 
+
+    const data_single<T, ALLOC>& get_ref() const override {
+        return ref_;
+    }
+    const data_array<T, ALLOC>& get_targets() const {
+        return targets_;
+    }
 private:
 
     static std::vector<std::string> labels;
@@ -143,15 +166,15 @@ public:
 protected:
     void prepare_impl(const std::filesystem::path& ref_path, const std::vector<std::filesystem::path>& def_paths) override {
         prepare_impl_common(
-            one_to_many<T, ALLOC>::template load_matrix_from_csv_single<no_padding>(ref_path),
-            one_to_many<T, ALLOC>::template load_matrix_array_from_csv<no_padding>(def_paths)
+            load_matrix_from_csv_single<T, no_padding, ALLOC>(ref_path),
+            load_matrix_array_from_csv<T, no_padding, ALLOC>(def_paths)
         );
     }
 
     void prepare_impl(const std::filesystem::path& ref_path, const std::filesystem::path& def_path) override {
         prepare_impl_common(
-            one_to_many<T, ALLOC>::template load_matrix_from_csv_single<no_padding>(ref_path),
-            one_to_many<T, ALLOC>::template load_matrix_array_from_csv<no_padding>(def_path)
+            load_matrix_from_csv_single<T, no_padding, ALLOC>(ref_path),
+            load_matrix_array_from_csv<T, no_padding, ALLOC>(def_path)
         );
     }
 
@@ -181,6 +204,12 @@ protected:
         cuda_memcpy_from_device(results_, d_results_);
     }
 
+    const data_single<T, ALLOC>& get_ref() const override {
+        return ref_;
+    }
+    const data_array<T, ALLOC>& get_targets() const {
+        return targets_;
+    }
 private:
 
     static std::vector<std::string> labels;

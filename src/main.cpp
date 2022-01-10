@@ -4,6 +4,8 @@
 #include <functional>
 #include <unordered_map>
 
+#include <boost/program_options.hpp>
+
 #include "validate.hpp"
 #include "matrix.hpp"
 #include "cross_corr.hpp"
@@ -15,96 +17,31 @@
 
 using namespace cross;
 
+namespace po = boost::program_options;
 using data_type = float;
 
-template<typename T>
-data_single<T> compute_valid_results(
-    const std::filesystem::path& in_ref,
-    const std::filesystem::path& in_tgt
-) {
-
-    std::ifstream ref_file(in_ref);
-    std::ifstream tgt_file(in_tgt);
-    auto ref = data_single<T>::template load_from_csv<no_padding>(ref_file);
-    auto tgt = data_single<T>::template load_from_csv<no_padding>(tgt_file);
-
-    return naive_cpu_cross_corr(ref, tgt, ref.size() + tgt.size() - 1);
-}
-
-template<typename T>
-data_single<T> get_valid_result_one_to_one(
-    const std::filesystem::path& in_ref,
-    const std::filesystem::path& in_tgt,
-    std::optional<std::filesystem::path> valid_result
-) {
-    if (valid_result) {
-        std::ifstream valid_res_file(*valid_result);
-        return data_single<T>::template load_from_csv<no_padding>(valid_res_file);
-    }
-    else {
-        std::ifstream ref_file(in_ref);
-        std::ifstream tgt_file(in_tgt);
-        auto ref = data_single<T>::template load_from_csv<no_padding>(ref_file);
-        auto tgt = data_single<T>::template load_from_csv<no_padding>(tgt_file);
-
-        return naive_cpu_cross_corr(ref.view(), tgt.view(), ref.matrix_size() + tgt.matrix_size() - 1);
-    }
-}
-
-template<typename T>
-data_array<T> get_valid_result_one_to_many(
-    const std::filesystem::path& in_ref,
-    const std::filesystem::path& in_tgt,
-    std::optional<std::filesystem::path> valid_result
-) {
-    if (valid_result) {
-        std::ifstream valid_res_file(*valid_result);
-        return data_array<T>::template load_from_csv<no_padding>(valid_res_file);
-    }
-    else {
-        std::ifstream ref_file(in_ref);
-        std::ifstream tgt_file(in_tgt);
-        auto ref = data_single<T>::template load_from_csv<no_padding>(ref_file);
-        auto tgt = data_array<T>::template load_from_csv<no_padding>(tgt_file);
-        data_array<T> result{tgt.num_matrices(), ref.matrix_size() + tgt.matrix_size() - 1};
-
-        for (auto i = 0; i < tgt.num_matrices(); ++i) {
-            // TODO: Do in parallel
-            naive_cpu_cross_corr(ref.view(), tgt.view(i), result.view(i));
-        }
-
-        return result;
-    }
-}
-
-template<typename ALG, typename DATA>
-void validate_results(
-    const ALG& alg,
-    const DATA& valid_result
+template<typename DATA>
+void validate(
+    const std::filesystem::path& target_path,
+    const std::filesystem::path& valid_path,
+    bool is_fft
 ){
-    auto res = alg.results();
+    std::ifstream target_file(target_path);
+    std::ifstream valid_file(valid_path);
+    auto target = DATA::template load_from_csv<no_padding>(target_file);
+    auto valid = DATA::template load_from_csv<no_padding>(valid_file);
 
-    results stats;
-    if (alg.is_fft()) {
-        auto norm = normalize_fft_results(res);
-        stats = validate_result(norm, valid_result);
-    }
-    else {
-        stats = validate_result(res, valid_result);
-    }
-
-    std::cout << "Difference from valid values:" << "\n";
-    std::cout << "Mean: " << stats.diff_mean << "\n";
-    std::cout << "Stddev: " << stats.diff_std_dev << "\n";
+    auto val = validate_with_precomputed(std::move(valid));
+    std::cout << val.validate(target, is_fft);
 }
 
 template<typename ALG>
-void run_one_to_many(
+void run_measurement(
     const std::filesystem::path& ref_path,
     const std::filesystem::path& def_path,
     const std::filesystem::path& out_path,
     const std::filesystem::path& measurements_path,
-    std::optional<std::filesystem::path> valid_results
+    const po::variable_value& validate
 ) {
     ALG alg;
     std::cerr << "Loading inputs\n";
@@ -120,8 +57,16 @@ void run_one_to_many(
     std::ofstream out_file(out_path);
     res.store_to_csv(out_file);
 
-    std::cerr << "Validating results\n";
-    validate_results(alg, get_valid_result_one_to_many<typename ALG::data_type>(ref_path, def_path, valid_results));
+    if (validate.empty()) {
+        std::cerr << "No validation\n";
+    } else if (validate.as<std::filesystem::path>() != std::filesystem::path{}) {
+        auto precomputed_data_path = validate.as<std::filesystem::path>();
+        std::cerr << "Validating results agains " << precomputed_data_path << "\n";
+        std::cout << alg.validate(precomputed_data_path);
+    } else {
+        std::cerr << "Computing valid results and validating\n";
+        std::cout << alg.validate();
+    }
 
 
     std::ofstream measurements_file(measurements_path);
@@ -132,38 +77,6 @@ void run_one_to_many(
 }
 
 
-template<typename ALG>
-void run_one_to_one(
-    const std::filesystem::path& ref_path,
-    const std::filesystem::path& def_path,
-    const std::filesystem::path& out_path,
-    const std::filesystem::path& measurements_path,
-    std::optional<std::filesystem::path> valid_results
-) {
-    ALG alg;
-    std::cerr << "Loading inputs\n";
-    alg.prepare(ref_path, def_path);
-
-    std::cerr << "Running test alg\n";
-    alg.run();
-
-    std::cerr << "Copying output data to host\n";
-    alg.finalize();
-
-    auto res = alg.results();
-    std::ofstream out_file(out_path);
-    res.store_to_csv(out_file);
-
-    std::cerr << "Validating results\n";
-    validate_results(alg, get_valid_result_one_to_one<typename ALG::data_type>(ref_path, def_path, valid_results));
-
-
-    std::ofstream measurements_file(measurements_path);
-    auto labels = alg.measurement_labels();
-    auto measurements = alg.measurements();
-    to_csv(measurements_file, labels);
-    to_csv<std::chrono::nanoseconds>(measurements_file, measurements);
-}
 
 
 static std::unordered_map<std::string, std::function<void(
@@ -171,38 +84,163 @@ static std::unordered_map<std::string, std::function<void(
     const std::filesystem::path&,
     const std::filesystem::path&,
     const std::filesystem::path&,
-    std::optional<std::filesystem::path>
+    const po::variable_value& validate
 )>> algorithms{
-    {"nai_orig", run_one_to_one<naive_original_alg<data_type, false, pinned_allocator<data_type>>>},
-    {"nai_rows_128", run_one_to_one<naive_ring_buffer_row_alg<data_type, 128, false, pinned_allocator<data_type>>>},
-    {"nai_rows_256", run_one_to_one<naive_ring_buffer_row_alg<data_type, 256, false, pinned_allocator<data_type>>>},
-    {"nai_def_block_128", run_one_to_many<naive_def_per_block<data_type, 128, false, pinned_allocator<data_type>>>},
-    {"nai_def_block_256", run_one_to_many<naive_def_per_block<data_type, 256, false, pinned_allocator<data_type>>>},
-    {"fft_orig", run_one_to_one<fft_original_alg<data_type, false, pinned_allocator<data_type>>>}
+    {"nai_orig", run_measurement<naive_original_alg<data_type, false, pinned_allocator<data_type>>>},
+    {"nai_rows_128", run_measurement<naive_ring_buffer_row_alg<data_type, 128, false, pinned_allocator<data_type>>>},
+    {"nai_rows_256", run_measurement<naive_ring_buffer_row_alg<data_type, 256, false, pinned_allocator<data_type>>>},
+    {"nai_def_block_128", run_measurement<naive_def_per_block<data_type, 128, false, pinned_allocator<data_type>>>},
+    {"nai_def_block_256", run_measurement<naive_def_per_block<data_type, 256, false, pinned_allocator<data_type>>>},
+    {"fft_orig", run_measurement<fft_original_alg<data_type, false, pinned_allocator<data_type>>>}
 };
 
+void print_help(std::ostream& out, const std::string& name, const po::options_description& options) {
+    out << "Usage: " << name << "[global options] command [run options] <alg> <ref_path> <target_path>\n";
+    out << "Commands: \n";
+    out << "\t" << name << "[global options] run [run options] <alg> <ref_path> <target_path>\n";
+    out << "\t" << name << "[global options] validate [validate options] <alg_type> <validate_data_path> <template_data_path>\n";
+    out << options;
+}
+
 int main(int argc, char **argv) {
-    // TODO: Better argument parsing
-    if (argc < 6 || argc > 7) {
-        std::cerr << "Invalid number of arguments, expected between " << 6 << " and " << 7 << " , got " << argc - 1 << "\n";
-        std::cerr << "Usage: " << argv[0] << "<alg> <ref_path> <target_path> <out_path> <measurements_path> [valid_results]\n";
-        return 1;
-    }
     try {
-        auto fnc = algorithms.find(argv[1]);
-        if (fnc == algorithms.end()) {
-            // TODO: List of available algorithms
-            std::cerr << "Unknown algorithm \"" << argv[1] << "\", expected one of " << std::endl;
+        std::string alg_name;
+        std::filesystem::path ref_path;
+        std::filesystem::path target_path;
+        std::filesystem::path out_path{"output.csv"};
+        std::filesystem::path measurements_path{"measurements.csv"};
+
+        po::options_description global_opts{"Global options"};
+        global_opts.add_options()
+            ("help,h", "display this help and exit")
+            ("command", po::value<std::string>(), "command to execute")
+            ("subargs", po::value<std::vector<std::string> >(), "Arguments for command")
+            ;
+
+        po::positional_options_description global_positional;
+        global_positional.
+            add("command", 1).
+            add("subargs", -1);
+
+
+        //po::options_description val_opts{"Validate options"};
+
+        po::options_description val_pos_opts;
+        val_pos_opts.add_options()
+            ("alg_type", po::value<std::string>(&alg_name)->required())
+            ("validate_data_path", po::value<std::filesystem::path>(&target_path)->required(), "path to the data to be validated")
+            ("template_data_path", po::value<std::filesystem::path>(&ref_path)->required(), "path to the valid data")
+            ;
+
+        po::positional_options_description val_positional;
+        val_positional.add("alg_type", 1);
+        val_positional.add("validate_data_path", 1);
+        val_positional.add("template_data_path", 1);
+
+        po::options_description all_val_options;
+        //all_val_options.add(val_opts);
+        all_val_options.add(val_pos_opts);
+
+        po::options_description run_opts{"Run options"};
+        run_opts.add_options()
+            ("out,o", po::value<std::filesystem::path>(&out_path)->default_value(out_path))
+            ("times,t", po::value<std::filesystem::path>(&measurements_path)->default_value(measurements_path))
+            ("validate,v", po::value<std::filesystem::path>()->implicit_value(""))
+            ;
+
+        po::options_description run_pos_opts;
+        run_pos_opts.add_options()
+            ("alg", po::value<std::string>(&alg_name)->required())
+            ("ref_path", po::value<std::filesystem::path>(&ref_path)->required(), "path to the reference data")
+            ("target_path", po::value<std::filesystem::path>(&target_path)->required(), "path to the target data")
+            ;
+
+        po::options_description all_run_options;
+        all_run_options.add(run_opts);
+        all_run_options.add(run_pos_opts);
+
+        po::positional_options_description run_positional;
+        run_positional.add("alg", 1);
+        run_positional.add("ref_path", 1);
+        run_positional.add("target_path", 1);
+
+        po::options_description all_options;
+        all_options.add(global_opts);
+        all_options.add(all_val_options);
+        all_options.add(all_run_options);
+
+        po::parsed_options parsed = po::command_line_parser(argc, argv).
+                options(global_opts).
+                positional(global_positional).
+                allow_unregistered().
+                run();
+        po::variables_map vm;
+        po::store(parsed, vm);
+
+
+
+        if (vm.count("help")) {
+            print_help(std::cout, argv[0], all_options);
+            return 0;
+        }
+
+        std::string cmd = vm["command"].as<std::string>();
+
+        if (cmd == "run") {
+            std::vector<std::string> opts = po::collect_unrecognized(parsed.options, po::include_positional);
+            opts.erase(opts.begin());
+
+            po::store(
+                po::command_line_parser(opts).
+                    options(all_run_options).
+                    positional(run_positional).
+                    run(),
+                vm
+            );
+
+            auto fnc = algorithms.find(alg_name);
+            if (fnc == algorithms.end()) {
+                // TODO: List of available algorithms
+                std::cerr << "Unknown algorithm \"" << alg_name << "\", expected one of " << std::endl;
+                print_help(std::cerr, argv[0], all_options);
+                return 1;
+            }
+
+            auto validate = vm["validate"];
+            fnc->second(ref_path, target_path, out_path, measurements_path, validate);
+            return 0;
+        } else if (cmd == "validate") {
+            std::vector<std::string> opts = po::collect_unrecognized(parsed.options, po::include_positional);
+            opts.erase(opts.begin());
+
+            po::store(
+                po::command_line_parser(opts).
+                    options(all_val_options).
+                    positional(val_positional).
+                    run(),
+                vm
+            );
+
+            // TODO: FFT results
+            if (alg_name == "single") {
+                validate<data_single<double>>(target_path, ref_path, false);
+            } else if (alg_name == "array") {
+                validate<data_array<double>>(target_path, ref_path, false);
+            } else {
+                std::cerr << "Unknown data type " << alg_name << "\n";
+                print_help(std::cerr, argv[0], all_options);
+                return 1;
+            }
+            return 0;
+        } else {
+            std::cerr << "Unknown command " << cmd << "\n";
+            print_help(std::cerr, argv[0], all_options);
             return 1;
         }
-
-        std::optional<std::filesystem::path> valid_results{};
-        if (argc == 7) {
-            valid_results = argv[6];
-        }
-
-        fnc->second(argv[2], argv[3], argv[4], argv[5], valid_results);
-        return 0;
+    }
+    catch (po::error& e) {
+        std::cerr << "Invalid commandline options: " << e.what() << std::endl;
+        return 1;
     }
     catch (std::exception& e) {
         std::cerr << "Exception occured: " << e.what() << std::endl;
