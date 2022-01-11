@@ -3,6 +3,8 @@
 #include <filesystem>
 #include <functional>
 #include <unordered_map>
+#include <algorithm>
+#include <vector>
 
 #include <boost/program_options.hpp>
 
@@ -14,6 +16,29 @@
 #include "fft_helpers.hpp"
 #include "one_to_one.hpp"
 #include "one_to_many.hpp"
+
+// Fix filesystem::path not working with program options when argument contains spaces
+// https://stackoverflow.com/questions/68716288/q-boost-program-options-using-stdfilesystempath-as-option-fails-when-the-gi
+namespace std::filesystem {
+    template <class CharT>
+    void validate(boost::any& v, std::vector<std::basic_string<CharT>> const& s,
+                  std::filesystem::path* p, int)
+    {
+        assert(s.size() == 1);
+        std::basic_stringstream<CharT> ss;
+
+        for (auto& el : s)
+            ss << std::quoted(el);
+
+        path converted;
+        ss >> std::noskipws >> converted;
+
+        if (ss.peek(); !ss.eof())
+            throw std::runtime_error("excess path characters");
+
+        v = std::move(converted);
+    }
+}
 
 using namespace cross;
 
@@ -87,6 +112,7 @@ static std::unordered_map<std::string, std::function<void(
     const po::variable_value& validate
 )>> algorithms{
     {"nai_orig", run_measurement<naive_original_alg<data_type, false, pinned_allocator<data_type>>>},
+    {"nai_orig_one_one", run_measurement<naive_original_alg_one_to_one<data_type, false, pinned_allocator<data_type>>>},
     {"nai_rows_128", run_measurement<naive_ring_buffer_row_alg<data_type, 128, false, pinned_allocator<data_type>>>},
     {"nai_rows_256", run_measurement<naive_ring_buffer_row_alg<data_type, 256, false, pinned_allocator<data_type>>>},
     {"nai_def_block_128", run_measurement<naive_def_per_block<data_type, 128, false, pinned_allocator<data_type>>>},
@@ -94,11 +120,20 @@ static std::unordered_map<std::string, std::function<void(
     {"fft_orig", run_measurement<fft_original_alg<data_type, false, pinned_allocator<data_type>>>}
 };
 
+static std::unordered_map<std::string, std::function<void(
+    const std::filesystem::path&,
+    const std::filesystem::path&,
+    bool is_fft
+)>> validations{
+    {"single", validate<data_single<double>>},
+    {"array", validate<data_array<double>>},
+};
+
 void print_help(std::ostream& out, const std::string& name, const po::options_description& options) {
-    out << "Usage: " << name << "[global options] command [run options] <alg> <ref_path> <target_path>\n";
+    out << "Usage: " << name << " [global options] command [run options] <alg> <ref_path> <target_path>\n";
     out << "Commands: \n";
-    out << "\t" << name << "[global options] run [run options] <alg> <ref_path> <target_path>\n";
-    out << "\t" << name << "[global options] validate [validate options] <alg_type> <validate_data_path> <template_data_path>\n";
+    out << "\t" << name << " [global options] run [run options] <alg> <ref_path> <target_path>\n";
+    out << "\t" << name << " [global options] validate [validate options] <alg_type> <validate_data_path> <template_data_path>\n";
     out << options;
 }
 
@@ -110,6 +145,7 @@ int main(int argc, char **argv) {
         std::filesystem::path out_path{"output.csv"};
         std::filesystem::path measurements_path{"measurements.csv"};
 
+        // TODO: Add handling of -- to separate options from positional arguments as program options doesn't do this by itself
         po::options_description global_opts{"Global options"};
         global_opts.add_options()
             ("help,h", "display this help and exit")
@@ -123,7 +159,7 @@ int main(int argc, char **argv) {
             add("subargs", -1);
 
 
-        //po::options_description val_opts{"Validate options"};
+        po::options_description val_opts{"Validate options"};
 
         po::options_description val_pos_opts;
         val_pos_opts.add_options()
@@ -138,7 +174,7 @@ int main(int argc, char **argv) {
         val_positional.add("template_data_path", 1);
 
         po::options_description all_val_options;
-        //all_val_options.add(val_opts);
+        all_val_options.add(val_opts);
         all_val_options.add(val_pos_opts);
 
         po::options_description run_opts{"Run options"};
@@ -183,11 +219,14 @@ int main(int argc, char **argv) {
             print_help(std::cout, argv[0], all_options);
             return 0;
         }
+        po::notify(vm);
 
         std::string cmd = vm["command"].as<std::string>();
 
         if (cmd == "run") {
             std::vector<std::string> opts = po::collect_unrecognized(parsed.options, po::include_positional);
+
+            // Remove the command name
             opts.erase(opts.begin());
 
             po::store(
@@ -197,11 +236,11 @@ int main(int argc, char **argv) {
                     run(),
                 vm
             );
+            po::notify(vm);
 
             auto fnc = algorithms.find(alg_name);
             if (fnc == algorithms.end()) {
-                // TODO: List of available algorithms
-                std::cerr << "Unknown algorithm \"" << alg_name << "\", expected one of " << std::endl;
+                std::cerr << "Unknown algorithm \"" << alg_name << "\", expected one of " << get_sorted_keys(algorithms) << std::endl;
                 print_help(std::cerr, argv[0], all_options);
                 return 1;
             }
@@ -220,17 +259,16 @@ int main(int argc, char **argv) {
                     run(),
                 vm
             );
+            po::notify(vm);
 
-            // TODO: FFT results
-            if (alg_name == "single") {
-                validate<data_single<double>>(target_path, ref_path, false);
-            } else if (alg_name == "array") {
-                validate<data_array<double>>(target_path, ref_path, false);
-            } else {
-                std::cerr << "Unknown data type " << alg_name << "\n";
+            auto fnc = validations.find(alg_name);
+            if (fnc == validations.end()) {
+                std::cerr << "Unknown data type \"" << alg_name << "\", expected one of " << get_sorted_keys(validations) << std::endl;
                 print_help(std::cerr, argv[0], all_options);
                 return 1;
             }
+            // TODO: FFT results
+            fnc->second(target_path, ref_path, false);
             return 0;
         } else {
             std::cerr << "Unknown command " << cmd << "\n";

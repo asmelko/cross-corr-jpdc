@@ -22,7 +22,7 @@ public:
     { }
 
     validation_results(double diff_mean, double diff_std_dev)
-        :empty_(true), diff_mean_(diff_mean), diff_std_dev_(diff_std_dev)
+        :empty_(false), diff_mean_(diff_mean), diff_std_dev_(diff_std_dev)
     { }
 
     double get_diff_mean() const {

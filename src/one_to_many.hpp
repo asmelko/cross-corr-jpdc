@@ -109,7 +109,7 @@ protected:
     const data_single<T, ALLOC>& get_ref() const override {
         return ref_;
     }
-    const data_array<T, ALLOC>& get_targets() const {
+    const data_array<T, ALLOC>& get_targets() const override {
         return targets_;
     }
 private:
@@ -207,7 +207,7 @@ protected:
     const data_single<T, ALLOC>& get_ref() const override {
         return ref_;
     }
-    const data_array<T, ALLOC>& get_targets() const {
+    const data_array<T, ALLOC>& get_targets() const override {
         return targets_;
     }
 private:

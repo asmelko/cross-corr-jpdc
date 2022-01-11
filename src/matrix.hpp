@@ -137,7 +137,6 @@ namespace impl {
             for (dsize_t y = 0; y < matrix_size.y; ++y) {
                 std::string line;
                 if (!std::getline(in, line)) {
-                    // TODO: Error
                     throw std::runtime_error{std::string{"Failed to read line "} + std::to_string(y) + " from csv file"};
                 }
 

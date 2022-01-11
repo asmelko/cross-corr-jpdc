@@ -45,6 +45,84 @@ protected:
     virtual const data_single<T, ALLOC>& get_target() const = 0;
 };
 
+template<typename T, bool DEBUG = false, typename ALLOC = std::allocator<T>>
+class naive_original_alg_one_to_one: public one_to_one<T, ALLOC> {
+public:
+    naive_original_alg_one_to_one()
+        :one_to_one<T, ALLOC>(false, labels.size()), ref_(), target_(), result_()
+    {
+
+    }
+
+    const data_single<T, ALLOC>& results() const override {
+        return result_;
+    }
+
+    const std::vector<std::string>& measurement_labels() const override {
+        return labels;
+    }
+
+protected:
+    void prepare_impl(const std::filesystem::path& ref_path, const std::filesystem::path& def_path) override {
+        ref_ = load_matrix_from_csv_single<T, no_padding, ALLOC>(ref_path);
+        target_ = load_matrix_from_csv_single<T, no_padding, ALLOC>(def_path);
+        result_ = data_single<T, ALLOC>{ref_.matrix_size() + target_.matrix_size() - 1};
+
+        cuda_malloc(&d_ref_, ref_.size());
+        cuda_malloc(&d_target_, target_.size());
+        cuda_malloc(&d_result_, result_.size());
+
+        cuda_memcpy_to_device(d_ref_, ref_);
+        cuda_memcpy_to_device(d_target_, target_);
+    }
+
+    void run_impl() override {
+        CUDA_MEASURE(1,
+            run_cross_corr_naive_original(
+                d_ref_,
+                d_target_,
+                d_result_,
+                target_.matrix_size(),
+                result_.matrix_size(),
+                1,
+                1
+            )
+        );
+
+        CUCH(cudaDeviceSynchronize());
+        CUCH(cudaGetLastError());
+    }
+
+    void finalize_impl() override {
+        cuda_memcpy_from_device(result_, d_result_);
+    }
+
+
+    const data_single<T, ALLOC>& get_ref() const override {
+        return ref_;
+    }
+    const data_single<T, ALLOC>& get_target() const override {
+        return target_;
+    }
+private:
+
+    static std::vector<std::string> labels;
+
+    data_single<T, ALLOC> ref_;
+    data_single<T, ALLOC> target_;
+
+    data_single<T, ALLOC> result_;
+
+    T* d_ref_;
+    T* d_target_;
+    T* d_result_;
+};
+
+template<typename T, bool DEBUG, typename ALLOC>
+std::vector<std::string> naive_original_alg_one_to_one<T, DEBUG, ALLOC>::labels{
+    "Total",
+    "Kernel"
+};
 
 template<typename T, dsize_t THREADS_PER_BLOCK, bool DEBUG = false, typename ALLOC = std::allocator<T>>
 class naive_ring_buffer_row_alg: public one_to_one<T, ALLOC> {
@@ -100,7 +178,7 @@ protected:
     const data_single<T, ALLOC>& get_ref() const override {
         return ref_;
     }
-    const data_single<T, ALLOC>& get_target() const {
+    const data_single<T, ALLOC>& get_target() const override {
         return target_;
     }
 
@@ -232,7 +310,7 @@ protected:
     const data_single<T, ALLOC>& get_ref() const override {
         return ref_;
     }
-    const data_single<T, ALLOC>& get_target() const {
+    const data_single<T, ALLOC>& get_target() const override {
         return target_;
     }
 

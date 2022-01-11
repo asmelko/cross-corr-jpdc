@@ -4,6 +4,8 @@
 #include <exception>
 #include <sstream>
 #include <iostream>
+#include <unordered_map>
+#include <algorithm>
 
 #include <cuda_runtime.h>
 
@@ -98,5 +100,14 @@ inline std::ostream& operator<<(std::ostream& out, const std::vector<float2>& ve
 	}
 	return out;
 }
+
+template<typename KEY, typename VALUE>
+std::vector<KEY> get_sorted_keys(const std::unordered_map<KEY, VALUE>& map) {
+	std::vector<std::string> keys{map.size()};
+	transform(map.begin(), map.end(), keys.begin(), [](auto pair){return pair.first;});
+	std::sort(keys.begin(), keys.end());
+	return keys;
+}
+
 
 }
