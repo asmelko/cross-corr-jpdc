@@ -18,17 +18,13 @@ namespace cross {
 
 using sw_clock = std::chrono::high_resolution_clock;
 
-template<typename T, typename PADDING, typename ALLOC = std::allocator<T>>
-static data_single<T, ALLOC> load_matrix_from_csv_single(const std::filesystem::path& path) {
-    std::ifstream file(path);
-    return data_single<T, ALLOC>::template load_from_csv<PADDING>(file);
-}
+
 
 /**
  * Load matrix array from many csv files, one matrix per csv file
  */
 template<typename T, typename PADDING, typename ALLOC = std::allocator<T>>
-static data_array<T,ALLOC> load_matrix_array_from_csv(const std::vector<std::filesystem::path>& paths) {
+data_array<T,ALLOC> load_matrix_array_from_csv(const std::vector<std::filesystem::path>& paths) {
     std::vector<std::ifstream> inputs(paths.size());
     for (auto&& path: paths) {
         inputs.push_back(std::ifstream{path});
@@ -40,9 +36,18 @@ static data_array<T,ALLOC> load_matrix_array_from_csv(const std::vector<std::fil
  * Load matrix array from single csv file containing multiple matrices
  */
 template<typename T, typename PADDING, typename ALLOC = std::allocator<T>>
-static data_array<T,ALLOC> load_matrix_array_from_csv(const std::filesystem::path& path) {
+data_array<T,ALLOC> load_matrix_array_from_csv(const std::filesystem::path& path) {
     std::ifstream file(path);
     return data_array<T,ALLOC>::template load_from_csv<PADDING>(file);
+}
+
+/**
+ * Load matrix from a csv file
+ */
+template<typename T, typename PADDING, typename ALLOC = std::allocator<T>>
+data_array<T,ALLOC> load_matrix_from_csv(const std::filesystem::path& path) {
+    // TODO: Maybe throw if more than one matrix
+    return load_matrix_array_from_csv<T, PADDING, ALLOC>(path);
 }
 
 template<typename T, typename ALLOC = std::allocator<T>>
@@ -54,6 +59,11 @@ public:
         :is_fft_(is_fft), sw_(num_measurements)
     {}
 
+    void prepare(const std::filesystem::path& ref_path, const std::filesystem::path& def_path) {
+        this->start_timer();
+        prepare_impl(ref_path, def_path);
+    }
+
     void run() {
         run_impl();
     }
@@ -63,7 +73,14 @@ public:
         sw_.cpu_manual_measure(0, start_);
     }
 
-    validation_results validate(const std::optional<std::filesystem::path>& valid_data = std::nullopt) {
+    virtual const data_array<T, ALLOC>& refs() const = 0;
+
+    virtual const data_array<T, ALLOC>& targets() const = 0;
+
+    virtual const data_array<T, ALLOC>& results() const = 0;
+
+
+    validation_results validate(const std::optional<std::filesystem::path>& valid_data = std::nullopt) const {
         return validate_impl(valid_data);
     }
 
@@ -82,9 +99,10 @@ protected:
     bool is_fft_;
     StopWatch<sw_clock> sw_;
 
+    virtual void prepare_impl(const std::filesystem::path& ref_path, const std::filesystem::path& def_path) = 0;
     virtual void run_impl() = 0;
     virtual void finalize_impl() = 0;
-    virtual validation_results validate_impl(const std::optional<std::filesystem::path>& valid_data) = 0;
+    virtual validation_results validate_impl(const std::optional<std::filesystem::path>& valid_data) const = 0;
 
     void start_timer() {
         start_ = sw_.now();

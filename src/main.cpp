@@ -45,7 +45,7 @@ using namespace cross;
 namespace po = boost::program_options;
 using data_type = float;
 
-template<typename DATA>
+template<typename DATATYPE>
 void validate(
     const std::filesystem::path& target_path,
     const std::filesystem::path& valid_path,
@@ -53,8 +53,8 @@ void validate(
 ){
     std::ifstream target_file(target_path);
     std::ifstream valid_file(valid_path);
-    auto target = DATA::template load_from_csv<no_padding>(target_file);
-    auto valid = DATA::template load_from_csv<no_padding>(valid_file);
+    auto target = data_array<DATATYPE>::template load_from_csv<no_padding>(target_file);
+    auto valid = data_array<DATATYPE>::template load_from_csv<no_padding>(valid_file);
 
     auto val = validate_with_precomputed(std::move(valid));
     std::cout << val.validate(target, is_fft);
@@ -120,15 +120,6 @@ static std::unordered_map<std::string, std::function<void(
     {"fft_orig", run_measurement<fft_original_alg<data_type, false, pinned_allocator<data_type>>>}
 };
 
-static std::unordered_map<std::string, std::function<void(
-    const std::filesystem::path&,
-    const std::filesystem::path&,
-    bool is_fft
-)>> validations{
-    {"single", validate<data_single<double>>},
-    {"array", validate<data_array<double>>},
-};
-
 void print_help(std::ostream& out, const std::string& name, const po::options_description& options) {
     out << "Usage: " << name << " [global options] command [run options] <alg> <ref_path> <target_path>\n";
     out << "Commands: \n";
@@ -163,13 +154,11 @@ int main(int argc, char **argv) {
 
         po::options_description val_pos_opts;
         val_pos_opts.add_options()
-            ("alg_type", po::value<std::string>(&alg_name)->required())
             ("validate_data_path", po::value<std::filesystem::path>(&target_path)->required(), "path to the data to be validated")
             ("template_data_path", po::value<std::filesystem::path>(&ref_path)->required(), "path to the valid data")
             ;
 
         po::positional_options_description val_positional;
-        val_positional.add("alg_type", 1);
         val_positional.add("validate_data_path", 1);
         val_positional.add("template_data_path", 1);
 
@@ -261,14 +250,8 @@ int main(int argc, char **argv) {
             );
             po::notify(vm);
 
-            auto fnc = validations.find(alg_name);
-            if (fnc == validations.end()) {
-                std::cerr << "Unknown data type \"" << alg_name << "\", expected one of " << get_sorted_keys(validations) << std::endl;
-                print_help(std::cerr, argv[0], all_options);
-                return 1;
-            }
             // TODO: FFT results
-            fnc->second(target_path, ref_path, false);
+            validate<double>(target_path, ref_path, false);
             return 0;
         } else {
             std::cerr << "Unknown command " << cmd << "\n";

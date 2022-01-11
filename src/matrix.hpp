@@ -89,35 +89,20 @@ namespace impl {
     // }
 
     namespace csv {
-        inline dsize_t read_num_matrices(std::istream& in) {
+        inline std::tuple<dsize2_t, dsize_t> read_header(std::istream& in) {
             std::string line;
             if (!std::getline(in, line)) {
-                // TODO: Error
-                throw std::runtime_error{"Could not read number of matricies from file"};
+                throw std::runtime_error{"Could not read file header"};
             }
-            boost::tokenizer<boost::escaped_list_separator<char>> tok(line);
+
+            if (line.compare(0, 2, "# ") != 0) {
+                throw std::runtime_error{"Invalid file header format"};
+            }
+
+            boost::tokenizer<boost::escaped_list_separator<char>> tok(line.substr(2));
             auto it = tok.begin();
             if (it == tok.end()) {
-                throw std::runtime_error{"Missing number of matricies width"};
-            }
-            dsize_t num = std::stoi(*it);
-
-            if (++it != tok.end()) {
-                throw std::runtime_error("Unexpected value, expected just one number");
-            }
-            return num;
-        }
-
-        inline dsize2_t read_matrix_size(std::istream& in) {
-            std::string line;
-            if (!std::getline(in, line)) {
-                // TODO: Error
-                throw std::runtime_error{"Could not read matrix size from file"};
-            }
-            boost::tokenizer<boost::escaped_list_separator<char>> tok(line);
-            auto it = tok.begin();
-            if (it == tok.end()) {
-                throw std::runtime_error{"Missing matrix width"};
+                throw std::runtime_error{"Missing matrix header"};
             }
             dsize_t width = std::stoi(*it);
 
@@ -126,10 +111,17 @@ namespace impl {
             }
             dsize_t height = std::stoi(*it);
 
+            dsize_t num_matrices = 1;
             if (++it != tok.end()) {
-                throw std::runtime_error("More than two dimensions are not supported");
+                num_matrices = std::stoi(*it);
+
+                if (++it != tok.end()) {
+                    throw std::runtime_error("Invalid matrix header format, too many tokens");
+                }
             }
-            return dsize2_t{width, height};
+
+
+            return {dsize2_t{width, height}, num_matrices};
         }
 
         template <typename T, typename PADDING>
@@ -172,12 +164,8 @@ namespace impl {
             }
         }
 
-        inline void write_num_matrices(std::ostream& out, dsize_t num_matrices) {
-            out << num_matrices << "\n";
-        }
-
-        inline void write_matrix_size(std::ostream& out, dsize2_t size) {
-            out << size.x << "," << size.y << "\n";
+        inline void write_header(std::ostream& out, dsize2_t size, dsize_t num_matrices = 1) {
+            out << size.x << "," << size.y << "," << num_matrices << "\n";
         }
 
         template <typename T>
@@ -401,118 +389,6 @@ public:
 };
 
 template<typename T, typename ALLOC = std::allocator<T>>
-class data_single {
-public:
-    using value_type = T;
-    using allocator_type = ALLOC;
-    using size_type = dsize_t;
-    using reference = value_type&;
-    using const_reference = const value_type&;
-    using pointer = typename std::allocator_traits<ALLOC>::pointer;
-    using const_pointer = typename std::allocator_traits<ALLOC>::const_pointer;
-
-    using iterator = pointer;
-    using const_iterator = const_pointer;
-
-    // static matrix<T, ALLOC> load_from_binary(std::istream& in) {
-
-    //     std::vector<T> data(width * height);
-    //     for (std::size_t i = 0; i < width * height; ++i) {
-    //         if (!impl::try_read_value(in, data[i])) {
-    //             // TODO: Invalid file format or error reading
-    //             throw std::runtime_error{"Invalid input file format"};
-    //         }
-    //     }
-
-    //     return matrix{};
-    // }
-
-    data_single()
-        :data_single<T, ALLOC>(dsize2_t{0,0})
-    { }
-
-    data_single(dsize2_t size)
-        :size_(size), data_(size.area())
-    { }
-
-    template<typename PADDING>
-    static data_single<T, ALLOC> load_from_csv(std::istream& in) {
-        auto size = impl::csv::read_matrix_size(in);
-        auto padded_size = PADDING::total_size(size);
-
-        std::vector<T, ALLOC> data(padded_size.area());
-        impl::csv::read_data<T, PADDING>(in, size, padded_size, data.data());
-
-        return data_single{padded_size, std::move(data)};
-    }
-
-    void store_to_csv(std::ostream& out) const {
-        impl::csv::write_matrix_size(out, size_);
-        impl::csv::write_data(out, size_, data_.data());
-    }
-
-    size_type size() const {
-        return size_.area();
-    }
-
-    dsize2_t matrix_size() const {
-        return size_;
-    }
-
-    pointer data() {
-        return data_.data();
-    }
-
-    const_pointer data() const {
-        return data_.data();
-    }
-
-    iterator begin() {
-        return data();
-    }
-
-    const_iterator begin() const {
-        return data();
-    }
-
-    iterator end() {
-        return data() + size();
-    }
-
-    const_iterator end() const {
-        return data() + size();
-    }
-
-    matrix_view<T> view() {
-        return matrix_view<T>{
-            size_,
-            data_.data()
-        };
-    }
-
-    matrix_view<const T> view() const {
-        return matrix_view<const T>{
-            size_,
-            data_.data()
-        };
-    }
-private:
-    dsize2_t size_;
-
-    std::vector<T, ALLOC> data_;
-
-    data_single(dsize2_t size, std::vector<T, ALLOC>&& data)
-        :size_(size), data_(std::move(data))
-    { }
-};
-
-template<typename T, typename ALLOC>
-std::ostream& operator<<(std::ostream& out, const data_single<T, ALLOC>& matrix) {
-    matrix.store_to_csv(out);
-    return out;
-}
-
-template<typename T, typename ALLOC = std::allocator<T>>
 class data_array {
 public:
     using value_type = T;
@@ -540,10 +416,10 @@ public:
     // }
 
     data_array()
-        :data_array<T, ALLOC>(0, dsize2_t{0,0})
+        :data_array<T, ALLOC>(dsize2_t{0,0}, 0)
     { }
 
-    data_array(dsize_t num_matrices, dsize2_t matrix_size)
+    data_array(dsize2_t matrix_size, dsize_t num_matrices = 1)
         :num_matrices_(num_matrices), matrix_size_(matrix_size), data_(matrix_size.area() * num_matrices)
     { }
 
@@ -553,13 +429,17 @@ public:
         std::vector<dsize2_t> padded_sizes;
         dsize_t total_data_size = 0;
         for (auto&& i : in) {
-            auto size = impl::csv::read_matrix_size(i);
-            auto padded_size = PADDING::total_size(size);
-            sizes.push_back(size);
+            auto [matrix_size, num_matrices] = impl::csv::read_header(i);
+            // TODO: Implement loading multiple matrices from file
+            if (num_matrices != 1) {
+                throw std::runtime_error{"Multi-file input contains more tahn one matrix per file"};
+            }
+            auto padded_size = PADDING::total_size(matrix_size);
+            sizes.push_back(matrix_size);
             padded_sizes.push_back(padded_size);
             total_data_size += padded_size.area();
 
-            if (sizes.size() > 0 && sizes[0] != size) {
+            if (sizes.size() > 0 && sizes[0] != matrix_size) {
                 throw std::runtime_error{"Data array contains matrices of different sizes"};
             }
         }
@@ -572,13 +452,12 @@ public:
             mat_data += padded_sizes[i].area();
         }
 
-        return data_array<T, ALLOC>{(dsize_t)sizes.size(), padded_sizes[0], std::move(data)};
+        return data_array<T, ALLOC>{padded_sizes[0], (dsize_t)sizes.size(), std::move(data)};
     }
 
     template<typename PADDING>
     static data_array<T, ALLOC> load_from_csv(std::ifstream& in) {
-        auto num_matrices = impl::csv::read_num_matrices(in);
-        auto matrix_size = impl::csv::read_matrix_size(in);
+        auto [matrix_size, num_matrices] = impl::csv::read_header(in);
 
         auto padded_matrix_size = PADDING::total_size(matrix_size);
         auto total_data_size = padded_matrix_size.area() * num_matrices;
@@ -589,21 +468,20 @@ public:
             impl::csv::read_data<T, PADDING>(in, matrix_size, padded_matrix_size, mat_data);
             mat_data += padded_matrix_size.area();
         }
-        return data_array<T, ALLOC>{num_matrices, padded_matrix_size, std::move(data)};
+        return data_array<T, ALLOC>{padded_matrix_size, num_matrices, std::move(data)};
     }
 
     void store_to_csv(std::vector<std::ofstream> outputs) const {
         for (dsize_t i = 0; i < outputs.size(); ++i) {
-            impl::csv::write_matrix_size(outputs[i], matrix_size_);
+            impl::csv::write_header(outputs[i], matrix_size_);
             impl::csv::write_data(outputs[i], matrix_size_, data_.data() + matrix_size_.area() * i);
         }
     }
 
     void store_to_csv(std::ofstream& output) const {
-        impl::csv::write_num_matrices(output, num_matrices_);
+        impl::csv::write_header(output, matrix_size_, num_matrices_);
 
         for (dsize_t i = 0; i < num_matrices_; ++i) {
-            impl::csv::write_matrix_size(output, matrix_size_);
             impl::csv::write_data(output, matrix_size_, data_.data() + matrix_size_.area() * i);
         }
     }
@@ -644,14 +522,14 @@ public:
         return data() + size();
     }
 
-    matrix_view<T> view(dsize_t matrix_index) {
+    matrix_view<T> view(dsize_t matrix_index = 0) {
         return matrix_view<T>{
             matrix_size_,
             data_.data() + matrix_size_.area() * matrix_index
         };
     }
 
-    matrix_view<const T> view(dsize_t matrix_index) const {
+    matrix_view<const T> view(dsize_t matrix_index = 0) const {
         return matrix_view<const T>{
             matrix_size_,
             data_.data() + matrix_size_.area() * matrix_index
@@ -664,7 +542,7 @@ private:
 
     std::vector<T, ALLOC> data_;
 
-    data_array(dsize_t num_matrices, dsize2_t matrix_size, std::vector<T, ALLOC>&& data)
+    data_array(dsize2_t matrix_size, dsize_t num_matrices, std::vector<T, ALLOC>&& data)
         :num_matrices_(num_matrices), matrix_size_(matrix_size), data_(std::move(data))
     { }
 };

@@ -236,15 +236,8 @@ void normalize_fft_results(const MAT_IN& res, MAT_OUT &&norm) {
 }
 
 template<typename T, typename ALLOC>
-data_single<T> normalize_fft_results(const data_single<T, ALLOC>& res) {
-    data_single<T> norm{res.matrix_size() - 1};
-    normalize_fft_results(res.view(), norm.view());
-    return norm;
-}
-
-template<typename T, typename ALLOC>
 data_array<T> normalize_fft_results(const data_array<T, ALLOC>& res) {
-    data_array<T> norm{res.num_matrices(), res.matrix_size() - 1};
+    data_array<T> norm{res.matrix_size() - 1, res.num_matrices()};
     for (auto i = 0; i < norm.num_matrices(); ++i) {
         // TOOD: In parallel
         normalize_fft_results(res.view(i), norm.view(i));

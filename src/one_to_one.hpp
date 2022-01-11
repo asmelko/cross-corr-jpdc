@@ -19,30 +19,18 @@ public:
         :cross_corr_alg<T, ALLOC>(is_fft, num_measurements)
     {}
 
-    void prepare(const std::filesystem::path& ref_path, const std::filesystem::path& def_path) {
-        this->start_timer();
-        prepare_impl(ref_path, def_path);
-    }
-
-    validation_results validate_impl(const std::optional<std::filesystem::path>& valid_data) override {
+    validation_results validate_impl(const std::optional<std::filesystem::path>& valid_data) const override {
         if (valid_data.has_value()) {
             auto val = validate_with_precomputed(
-                load_matrix_from_csv_single<T, no_padding>(*valid_data)
+                load_matrix_from_csv<T, no_padding>(*valid_data)
             );
-            return val.validate(results(), this->is_fft());
+            return val.validate(this->results(), this->is_fft());
         } else {
-            auto val = validate_with_computed_one_to_one(get_ref(), get_target());
-            return val.validate(results(), this->is_fft());
+            auto val = validate_with_computed_one_to_one(this->refs(), this->targets());
+            return val.validate(this->results(), this->is_fft());
         }
         return validation_results{};
     }
-
-    virtual const data_single<T, ALLOC>& results() const = 0;
-protected:
-    virtual void prepare_impl(const std::filesystem::path& ref_path, const std::filesystem::path& def_path) = 0;
-
-    virtual const data_single<T, ALLOC>& get_ref() const = 0;
-    virtual const data_single<T, ALLOC>& get_target() const = 0;
 };
 
 template<typename T, bool DEBUG = false, typename ALLOC = std::allocator<T>>
@@ -54,7 +42,15 @@ public:
 
     }
 
-    const data_single<T, ALLOC>& results() const override {
+    const data_array<T, ALLOC>& refs() const override {
+        return ref_;
+    }
+
+    const data_array<T, ALLOC>& targets() const override {
+        return target_;
+    }
+
+    const data_array<T, ALLOC>& results() const override {
         return result_;
     }
 
@@ -64,9 +60,9 @@ public:
 
 protected:
     void prepare_impl(const std::filesystem::path& ref_path, const std::filesystem::path& def_path) override {
-        ref_ = load_matrix_from_csv_single<T, no_padding, ALLOC>(ref_path);
-        target_ = load_matrix_from_csv_single<T, no_padding, ALLOC>(def_path);
-        result_ = data_single<T, ALLOC>{ref_.matrix_size() + target_.matrix_size() - 1};
+        ref_ = load_matrix_from_csv<T, no_padding, ALLOC>(ref_path);
+        target_ = load_matrix_from_csv<T, no_padding, ALLOC>(def_path);
+        result_ = data_array<T, ALLOC>{ref_.matrix_size() + target_.matrix_size() - 1, 1};
 
         cuda_malloc(&d_ref_, ref_.size());
         cuda_malloc(&d_target_, target_.size());
@@ -97,21 +93,14 @@ protected:
         cuda_memcpy_from_device(result_, d_result_);
     }
 
-
-    const data_single<T, ALLOC>& get_ref() const override {
-        return ref_;
-    }
-    const data_single<T, ALLOC>& get_target() const override {
-        return target_;
-    }
 private:
 
     static std::vector<std::string> labels;
 
-    data_single<T, ALLOC> ref_;
-    data_single<T, ALLOC> target_;
+    data_array<T, ALLOC> ref_;
+    data_array<T, ALLOC> target_;
 
-    data_single<T, ALLOC> result_;
+    data_array<T, ALLOC> result_;
 
     T* d_ref_;
     T* d_target_;
@@ -133,7 +122,15 @@ public:
 
     }
 
-    const data_single<T, ALLOC>& results() const override {
+    const data_array<T, ALLOC>& refs() const override {
+        return ref_;
+    }
+
+    const data_array<T, ALLOC>& targets() const override {
+        return target_;
+    }
+
+    const data_array<T, ALLOC>& results() const override {
         return res_;
     }
 
@@ -143,9 +140,9 @@ public:
 
 protected:
     void prepare_impl(const std::filesystem::path& ref_path, const std::filesystem::path& target_path) override {
-        ref_ = load_matrix_from_csv_single<T, no_padding, ALLOC>(ref_path);
-        target_ = load_matrix_from_csv_single<T, no_padding, ALLOC>(target_path);
-        res_ = data_single<T, ALLOC>{ref_.matrix_size() + target_.matrix_size() - 1};
+        ref_ = load_matrix_from_csv<T, no_padding, ALLOC>(ref_path);
+        target_ = load_matrix_from_csv<T, no_padding, ALLOC>(target_path);
+        res_ = data_array<T, ALLOC>{ref_.matrix_size() + target_.matrix_size() - 1};
 
         cuda_malloc(&d_ref_, ref_.size());
         cuda_malloc(&d_target_, target_.size());
@@ -175,21 +172,14 @@ protected:
         cuda_memcpy_from_device(res_, d_res_);
     }
 
-    const data_single<T, ALLOC>& get_ref() const override {
-        return ref_;
-    }
-    const data_single<T, ALLOC>& get_target() const override {
-        return target_;
-    }
-
 private:
 
     static std::vector<std::string> labels;
 
-    data_single<T, ALLOC> ref_;
-    data_single<T, ALLOC> target_;
+    data_array<T, ALLOC> ref_;
+    data_array<T, ALLOC> target_;
 
-    data_single<T, ALLOC> res_;
+    data_array<T, ALLOC> res_;
 
     T* d_ref_;
     T* d_target_;
@@ -212,7 +202,15 @@ public:
 
     }
 
-    const data_single<T, ALLOC>& results() const override {
+    const data_array<T, ALLOC>& refs() const override {
+        return ref_;
+    }
+
+    const data_array<T, ALLOC>& targets() const override {
+        return target_;
+    }
+
+    const data_array<T, ALLOC>& results() const override {
         return res_;
     }
 
@@ -223,8 +221,8 @@ public:
 protected:
     void prepare_impl(const std::filesystem::path& ref_path, const std::filesystem::path& target_path) override {
 
-        ref_ = load_matrix_from_csv_single<T, relative_zero_padding<2>, ALLOC>(ref_path);
-        target_ = load_matrix_from_csv_single<T, relative_zero_padding<2>, ALLOC>(target_path);
+        ref_ = load_matrix_from_csv<T, relative_zero_padding<2>, ALLOC>(ref_path);
+        target_ = load_matrix_from_csv<T, relative_zero_padding<2>, ALLOC>(target_path);
 
         if (DEBUG)
         {
@@ -236,7 +234,7 @@ protected:
         }
 
 
-        res_ = data_single<T, ALLOC>{ref_.matrix_size()};
+        res_ = data_array<T, ALLOC>{ref_.matrix_size()};
         fft_buffer_size_ = ref_.matrix_size().y * (ref_.matrix_size().x / 2 + 1);
 
         cuda_malloc(&d_ref_, ref_.size());
@@ -307,24 +305,16 @@ protected:
         cuda_memcpy_from_device(res_, d_res_);
     }
 
-    const data_single<T, ALLOC>& get_ref() const override {
-        return ref_;
-    }
-    const data_single<T, ALLOC>& get_target() const override {
-        return target_;
-    }
-
-
 private:
     using fft_real_t = typename real_trait<T>::type;
     using fft_complex_t = typename complex_trait<T>::type;
 
     static std::vector<std::string> labels;
 
-    data_single<T, ALLOC> ref_;
-    data_single<T, ALLOC> target_;
+    data_array<T, ALLOC> ref_;
+    data_array<T, ALLOC> target_;
 
-    data_single<T, ALLOC> res_;
+    data_array<T, ALLOC> res_;
 
     T* d_ref_;
     T* d_target_;

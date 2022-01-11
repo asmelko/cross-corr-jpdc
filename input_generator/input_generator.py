@@ -15,21 +15,22 @@ DEFAULT_OUTPUT_FORMAT = OutputFormats.CSV
 DEFAULT_OUTPUT_PATH = Path(__file__).resolve().parent.parent / "data" / "data.csv"
 
 
-def generate(size: Tuple[int, int], format: OutputFormats, output_path: Path):
-    rng = np.random.default_rng()
-    # vals = rng.integers(0, 256, size=size)
-    print("Generating random matrix")
-    vals = rng.random(size=size)
-
+def save(num_matrices: int, values: np.ndarray, format: OutputFormats, output_path: Path):
     if format == OutputFormats.CSV:
         print(f"Saving data to {str(output_path)}")
         with output_path.open(mode='w') as f:
-            f.write(f'{size[1]},{size[0]}\n')
-            np.savetxt(f, vals, delimiter=',')
+            np.savetxt(f, values, delimiter=',', header=f'{int(values.shape[0] / num_matrices)},{values.shape[1]},{num_matrices}')
 
 
-def _generate(args: argparse.Namespace):
-    generate([args.rows, args.columns], args.format, args.output_path.absolute())
+def generate(rows: int, columns: int):
+    rng = np.random.default_rng()
+    print("Generating random matrix")
+    return rng.random(size=(rows, columns))
+
+
+def _generate_matrix(args: argparse.Namespace):
+    values = generate(args.num_matrices * args.rows, args.columns)
+    save(args.num_matrices, values, args.format, args.output_path.absolute())
 
 
 def add_arguments(parser: argparse.ArgumentParser):
@@ -47,13 +48,18 @@ def add_arguments(parser: argparse.ArgumentParser):
                                 choices=list(OutputFormats),
                                 default=DEFAULT_OUTPUT_FORMAT,
                                 help=f"Output file format (defaults to {DEFAULT_OUTPUT_FORMAT})")
-    input_generate.add_argument("columns",
-                                type=int,
-                                help=f"Number of columns of the generated matrix")
     input_generate.add_argument("rows",
                                 type=int,
                                 help=f"Number of rows of the generated matrix")
-    input_generate.set_defaults(action=_generate)
+    input_generate.add_argument("columns",
+                                type=int,
+                                help=f"Number of columns of the generated matrix")
+    input_generate.add_argument("num_matrices",
+                                nargs="?",
+                                type=int,
+                                default=1,
+                                help=f"Number of matrices of given size to generate (default {1})")
+    input_generate.set_defaults(action=_generate_matrix)
 
 
 def main():

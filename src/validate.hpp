@@ -94,16 +94,6 @@ void naive_cpu_cross_corr(const MAT1& ref, const MAT2& target, MAT3&& res) {
     }
 }
 
-template<typename MAT, typename RES = typename MAT::value_type>
-data_single<RES> naive_cpu_cross_corr(const MAT& ref, const MAT& target, dsize2_t search_size) {
-
-    data_single<RES> res{search_size};
-    naive_cpu_cross_corr(ref, target, res.view());
-    return res;
-}
-
-
-
 template<typename MAT1, typename MAT2>
 validation_results validate_result(const MAT1& result, const MAT2& valid_result) {
     std::vector<double> differences;
@@ -162,13 +152,15 @@ protected:
 };
 
 template<typename T, typename ALLOC>
-validator<data_single<T>> validate_with_computed_one_to_one(const data_single<T, ALLOC>& ref, const data_single<T, ALLOC>& target) {
-    return validator<data_single<T>>(naive_cpu_cross_corr<matrix_view<const T>, T>(ref.view(), target.view(), ref.matrix_size() + target.matrix_size() - 1));
+validator<data_array<T>> validate_with_computed_one_to_one(const data_array<T, ALLOC>& ref, const data_array<T, ALLOC>& target) {
+    data_array<T> valid_results{ref.matrix_size() + target.matrix_size() - 1};
+    naive_cpu_cross_corr(ref.view(), target.view(), valid_results.view());
+    return validator<data_array<T>>(std::move(valid_results));
 }
 
 template<typename T, typename ALLOC>
-validator<data_array<T>> validate_with_computed_one_to_many(const data_single<T, ALLOC>& ref, const data_array<T, ALLOC>& target) {
-    data_array<T> valid_results{target.num_matrices(), ref.matrix_size() + target.matrix_size() - 1};
+validator<data_array<T>> validate_with_computed_one_to_many(const data_array<T, ALLOC>& ref, const data_array<T, ALLOC>& target) {
+    data_array<T> valid_results{ref.matrix_size() + target.matrix_size() - 1, target.num_matrices()};
     for (auto i = 0; i < target.num_matrices(); ++i) {
         // TODO: Do in parallel
         naive_cpu_cross_corr(ref.view(), target.view(i), valid_results.view(i));
