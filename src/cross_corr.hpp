@@ -70,7 +70,7 @@ public:
 
     void finalize() {
         finalize_impl();
-        sw_.cpu_manual_measure(0, start_);
+        sw_.cpu_measure(0, start_);
     }
 
     virtual const data_array<T, ALLOC>& refs() const = 0;
@@ -97,7 +97,7 @@ public:
 protected:
 
     bool is_fft_;
-    StopWatch<sw_clock> sw_;
+    stopwatch<sw_clock> sw_;
 
     virtual void prepare_impl(const std::filesystem::path& ref_path, const std::filesystem::path& def_path) = 0;
     virtual void run_impl() = 0;
