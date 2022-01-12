@@ -16,6 +16,7 @@
 #include "fft_helpers.hpp"
 #include "one_to_one.hpp"
 #include "one_to_many.hpp"
+#include "n_to_mn.hpp"
 
 // Fix filesystem::path not working with program options when argument contains spaces
 // https://stackoverflow.com/questions/68716288/q-boost-program-options-using-stdfilesystempath-as-option-fails-when-the-gi
@@ -111,8 +112,9 @@ static std::unordered_map<std::string, std::function<void(
     const std::filesystem::path&,
     const po::variable_value& validate
 )>> algorithms{
-    {"nai_orig", run_measurement<naive_original_alg<data_type, false, pinned_allocator<data_type>>>},
     {"nai_orig_one_one", run_measurement<naive_original_alg_one_to_one<data_type, false, pinned_allocator<data_type>>>},
+    {"nai_orig_one_many", run_measurement<naive_original_alg_one_to_many<data_type, false, pinned_allocator<data_type>>>},
+    {"nai_orig_n_to_mn", run_measurement<naive_original_alg_n_to_mn<data_type, false, pinned_allocator<data_type>>>},
     {"nai_rows_128", run_measurement<naive_ring_buffer_row_alg<data_type, 128, false, pinned_allocator<data_type>>>},
     {"nai_rows_256", run_measurement<naive_ring_buffer_row_alg<data_type, 256, false, pinned_allocator<data_type>>>},
     {"nai_def_block_128", run_measurement<naive_def_per_block<data_type, 128, false, pinned_allocator<data_type>>>},

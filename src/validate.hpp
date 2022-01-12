@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <algorithm>
+#include <string>
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
 #include <boost/accumulators/statistics/mean.hpp>
@@ -12,6 +13,9 @@
 #include "matrix.hpp"
 
 namespace accs = boost::accumulators;
+
+
+using namespace std::string_literals;
 
 namespace cross {
 
@@ -165,6 +169,30 @@ validator<data_array<T>> validate_with_computed_one_to_many(const data_array<T, 
         // TODO: Do in parallel
         naive_cpu_cross_corr(ref.view(), target.view(i), valid_results.view(i));
     }
+    return validator<data_array<T>>(std::move(valid_results));
+}
+
+template<typename T, typename ALLOC>
+validator<data_array<T>> validate_with_computed_n_to_mn(const data_array<T, ALLOC>& ref, const data_array<T, ALLOC>& target) {
+    if (target.num_matrices() % ref.num_matrices() != 0) {
+        throw std::runtime_error(
+            "Invalid ref and target data counts, "s +
+            std::to_string(target.num_matrices()) +
+            " is not divisible by "s +
+            std::to_string(ref.num_matrices())
+        );
+    }
+
+    data_array<T> valid_results{ref.matrix_size() + target.matrix_size() - 1, target.num_matrices()};
+
+    // TODO: Do in parallel
+    for (auto r = 0; r < ref.num_matrices(); ++r) {
+        for (auto t = 0; t < target.num_matrices() / ref.num_matrices() ; ++t) {
+            auto t_matrix_index = t * ref.num_matrices() + r;
+            naive_cpu_cross_corr(ref.view(r), target.view(t_matrix_index), valid_results.view(t_matrix_index));
+        }
+    }
+
     return validator<data_array<T>>(std::move(valid_results));
 }
 

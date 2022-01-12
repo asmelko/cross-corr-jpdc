@@ -36,9 +36,9 @@ public:
 
 
 template<typename T, bool DEBUG = false, typename ALLOC = std::allocator<T>>
-class naive_original_alg: public one_to_many<T, ALLOC> {
+class naive_original_alg_one_to_many: public one_to_many<T, ALLOC> {
 public:
-    naive_original_alg()
+    naive_original_alg_one_to_many()
         :one_to_many<T, ALLOC>(false, labels.size()), ref_(), targets_(), results_()
     {
 
@@ -110,7 +110,7 @@ private:
 };
 
 template<typename T, bool DEBUG, typename ALLOC>
-std::vector<std::string> naive_original_alg<T, DEBUG, ALLOC>::labels{
+std::vector<std::string> naive_original_alg_one_to_many<T, DEBUG, ALLOC>::labels{
     "Total",
     "Kernel"
 };

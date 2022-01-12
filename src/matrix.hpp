@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <iostream>
 #include <fstream>
+#include <stdexcept>
 
 // TODO: Workaround for missing header if not C++20
 #include <bit>
