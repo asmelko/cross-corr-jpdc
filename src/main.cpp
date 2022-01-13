@@ -17,6 +17,7 @@
 #include "one_to_one.hpp"
 #include "one_to_many.hpp"
 #include "n_to_mn.hpp"
+#include "n_to_m.hpp"
 
 // Fix filesystem::path not working with program options when argument contains spaces
 // https://stackoverflow.com/questions/68716288/q-boost-program-options-using-stdfilesystempath-as-option-fails-when-the-gi
@@ -57,8 +58,7 @@ void validate(
     auto target = data_array<DATATYPE>::template load_from_csv<no_padding>(target_file);
     auto valid = data_array<DATATYPE>::template load_from_csv<no_padding>(valid_file);
 
-    auto val = validate_with_precomputed(std::move(valid));
-    std::cout << val.validate(target, is_fft);
+    std::cout << compare_results(valid, target, is_fft);
 }
 
 template<typename ALG>
@@ -112,6 +112,10 @@ static std::unordered_map<std::string, std::function<void(
     const std::filesystem::path&,
     const po::variable_value& validate
 )>> algorithms{
+    {"cpu_one_one", run_measurement<cpu_one_to_one<data_type, false>>},
+    {"cpu_one_many", run_measurement<cpu_one_to_many<data_type, false>>},
+    {"cpu_n_to_mn", run_measurement<cpu_n_to_mn<data_type, false>>},
+    {"cpu_n_to_m", run_measurement<cpu_n_to_m<data_type, false>>},
     {"nai_orig_one_one", run_measurement<naive_original_alg_one_to_one<data_type, false, pinned_allocator<data_type>>>},
     {"nai_orig_one_many", run_measurement<naive_original_alg_one_to_many<data_type, false, pinned_allocator<data_type>>>},
     {"nai_orig_n_to_mn", run_measurement<naive_original_alg_n_to_mn<data_type, false, pinned_allocator<data_type>>>},

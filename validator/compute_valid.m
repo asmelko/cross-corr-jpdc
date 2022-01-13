@@ -45,7 +45,24 @@ try
 
         header = [result_matrix_size, in2_num_matrices];
     case 'n_to_m'
-        error('Algorithm %s not implemented', alg)
+        g_in1 = gpuArray(in1_data);
+        g_in2 = gpuArray(in2_data);
+
+        result_matrix_size = in1_matrix_size + in2_matrix_size - 1;
+        result_matrix = zeros(result_matrix_size(1) * in1_num_matrices * in2_num_matrices, result_matrix_size(2));
+        for r = 1:in1_num_matrices
+            g_in1_mat = g_in1(1 + (r - 1)*in1_matrix_size(1):r*in1_matrix_size(1),:);
+            for t = 1:in2_num_matrices
+                res_matrix_start_row = 1 + ((t-1) + (r-1)*in2_num_matrices)*result_matrix_size(1);
+
+                g_in2_mat = g_in2(1 + (t - 1)*in2_matrix_size(1):t*in2_matrix_size(1),:);
+                g_xcor = xcorr2(g_in1_mat, g_in2_mat);
+
+                result_matrix(res_matrix_start_row:res_matrix_start_row + (result_matrix_size(1) - 1),:) = gather(g_xcor);
+            end
+        end
+
+        header = [result_matrix_size, in1_num_matrices * in2_num_matrices];
     case 'n_to_mn'
         assert(mod(in2_num_matrices, in1_num_matrices) == 0)
         g_in1 = gpuArray(in1_data);

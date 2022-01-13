@@ -1,7 +1,11 @@
 #pragma once
 
 #include <utility>
+#include <string>
+
 #include <cuda_runtime.h>
+
+using namespace std::string_literals;
 
 namespace cross {
 
@@ -142,6 +146,10 @@ inline bool operator!=(const vec2<T> & lhs, const vec2<T> & rhs)
 	return !(lhs == rhs);
 }
 
+template<typename T>
+inline std::string to_string(const vec2<T>& v) {
+	return "["s + std::to_string(v.x) + ","s + std::to_string(v.y) + "]"s;
+}
 
 using dsize2_t = vec2<unsigned int>;
 using ddiff2_t = vec2<int>;

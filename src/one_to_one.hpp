@@ -19,18 +19,65 @@ public:
         :cross_corr_alg<T, ALLOC>(is_fft, num_measurements)
     {}
 
-    validation_results validate_impl(const std::optional<std::filesystem::path>& valid_data) const override {
-        if (valid_data.has_value()) {
-            auto val = validate_with_precomputed(
-                load_matrix_from_csv<T, no_padding>(*valid_data)
-            );
-            return val.validate(this->results(), this->is_fft());
-        } else {
-            auto val = validate_with_computed_one_to_one(this->refs(), this->targets());
-            return val.validate(this->results(), this->is_fft());
-        }
-        return validation_results{};
+protected:
+    data_array<T> get_valid_results() const override {
+        return cpu_cross_corr_one_to_one(this->refs(), this->targets());
     }
+};
+
+template<typename T, bool DEBUG = false, typename ALLOC = std::allocator<T>>
+class cpu_one_to_one: public one_to_one<T, ALLOC> {
+public:
+    cpu_one_to_one()
+        :one_to_one<T, ALLOC>(false, labels.size()), ref_(), target_(), result_()
+    {
+
+    }
+
+    const data_array<T, ALLOC>& refs() const override {
+        return ref_;
+    }
+    const data_array<T, ALLOC>& targets() const override {
+        return target_;
+    }
+
+    const data_array<T, ALLOC>& results() const override {
+        return result_;
+    }
+
+    const std::vector<std::string>& measurement_labels() const override {
+        return labels;
+    }
+
+protected:
+    void prepare_impl(const std::filesystem::path& ref_path, const std::filesystem::path& def_path) override {
+        ref_ = load_matrix_from_csv<T, no_padding, ALLOC>(ref_path);
+        target_ = load_matrix_from_csv<T, no_padding, ALLOC>(def_path);
+
+        auto result_matrix_size = ref_.matrix_size() + target_.matrix_size() - 1;
+        result_ = data_array<T, ALLOC>{result_matrix_size};
+    }
+
+    void run_impl() override {
+        cpu_cross_corr_one_to_one(ref_, target_, result_);
+    }
+
+    void finalize_impl() override {
+    }
+
+
+private:
+    static std::vector<std::string> labels;
+
+    data_array<T, ALLOC> ref_;
+    data_array<T, ALLOC> target_;
+
+    data_array<T, ALLOC> result_;
+};
+
+template<typename T, bool DEBUG, typename ALLOC>
+std::vector<std::string> cpu_one_to_one<T, DEBUG, ALLOC>::labels{
+    "Total",
 };
 
 template<typename T, bool DEBUG = false, typename ALLOC = std::allocator<T>>

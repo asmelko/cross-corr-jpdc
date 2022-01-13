@@ -80,8 +80,14 @@ public:
     virtual const data_array<T, ALLOC>& results() const = 0;
 
 
-    validation_results validate(const std::optional<std::filesystem::path>& valid_data = std::nullopt) const {
-        return validate_impl(valid_data);
+    validation_results validate(const std::optional<std::filesystem::path>& valid_data_path = std::nullopt) const {
+        if (valid_data_path.has_value()) {
+            auto valid_data = load_matrix_array_from_csv<T, no_padding>(*valid_data_path);
+            return compare_results(valid_data, this->results(), this->is_fft());
+        } else {
+            return compare_results(get_valid_results(), this->results(), this->is_fft());
+        }
+        return validation_results{};
     }
 
 
@@ -102,7 +108,7 @@ protected:
     virtual void prepare_impl(const std::filesystem::path& ref_path, const std::filesystem::path& def_path) = 0;
     virtual void run_impl() = 0;
     virtual void finalize_impl() = 0;
-    virtual validation_results validate_impl(const std::optional<std::filesystem::path>& valid_data) const = 0;
+    virtual data_array<T> get_valid_results() const = 0;
 
     void start_timer() {
         start_ = sw_.now();

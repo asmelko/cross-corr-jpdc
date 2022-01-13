@@ -100,6 +100,8 @@ void naive_cpu_cross_corr(const MAT1& ref, const MAT2& target, MAT3&& res) {
 
 template<typename MAT1, typename MAT2>
 validation_results validate_result(const MAT1& result, const MAT2& valid_result) {
+    // TODO: Throw when number of elements does not match
+
     std::vector<double> differences;
 
     std::transform(
@@ -128,52 +130,81 @@ validation_results validate_result(const MAT1& result, const MAT2& valid_result)
 
 }
 
-
-
-template<typename DATA>
-class validator {
-public:
-
-
-    validator(DATA&& valid_results)
-        :valid_results_(std::move(valid_results))
-    {
-
+template<typename RESULTS, typename VALID>
+validation_results compare_results(const RESULTS& results, const VALID& valid_results, bool is_fft) {
+    if (is_fft) {
+        auto norm = normalize_fft_results(results);
+        return validate_result(norm, valid_results);
     }
-
-    template<typename RESULTS>
-    validation_results validate(const RESULTS& results, bool is_fft) {
-        if (is_fft) {
-            auto norm = normalize_fft_results(results);
-            return validate_result(norm, valid_results_);
-        }
-        else {
-            return validate_result(results, valid_results_);
-        }
+    else {
+        return validate_result(results, valid_results);
     }
-protected:
-    DATA valid_results_;
-};
+}
 
-template<typename T, typename ALLOC>
-validator<data_array<T>> validate_with_computed_one_to_one(const data_array<T, ALLOC>& ref, const data_array<T, ALLOC>& target) {
-    data_array<T> valid_results{ref.matrix_size() + target.matrix_size() - 1};
-    naive_cpu_cross_corr(ref.view(), target.view(), valid_results.view());
-    return validator<data_array<T>>(std::move(valid_results));
+inline dsize2_t result_matrix_size(dsize2_t ref_size, dsize2_t target_size) {
+    return ref_size + target_size - 1;
+}
+
+inline void check_matrix_size(dsize2_t ref_size, dsize2_t target_size, dsize2_t result_size) {
+    if (result_size != result_matrix_size(ref_size, target_size)) {
+        throw std::runtime_error(
+            "Invalid result matrix size "s +
+            to_string(result_size) +
+            ", expected "s +
+            to_string(result_matrix_size(ref_size, target_size))
+        );
+    }
+}
+
+inline void check_num_result_matrices(dsize_t actual, dsize_t expected) {
+    if (actual != expected) {
+      throw std::runtime_error(
+            "Invalid number of result matrices "s +
+            std::to_string(actual) +
+            ", expected "s +
+            std::to_string(expected)
+        );
+    }
+}
+
+template<typename REF, typename TARGET, typename RESULT>
+void cpu_cross_corr_one_to_one(const REF& ref, const TARGET& target, RESULT& result) {
+    check_matrix_size(ref.matrix_size(), target.matrix_size(), result.matrix_size());
+    check_num_result_matrices(result.num_matrices(), 1);
+
+    naive_cpu_cross_corr(ref.view(), target.view(), result.view());
 }
 
 template<typename T, typename ALLOC>
-validator<data_array<T>> validate_with_computed_one_to_many(const data_array<T, ALLOC>& ref, const data_array<T, ALLOC>& target) {
-    data_array<T> valid_results{ref.matrix_size() + target.matrix_size() - 1, target.num_matrices()};
+data_array<T> cpu_cross_corr_one_to_one(const data_array<T, ALLOC>& ref, const data_array<T, ALLOC>& target) {
+    data_array<T> result{result_matrix_size(ref.matrix_size(), target.matrix_size())};
+    cpu_cross_corr_one_to_one(ref, target, result);
+    return result;
+}
+
+template<typename REF, typename TARGET, typename RESULT>
+void cpu_cross_corr_one_to_many(const REF& ref, const TARGET& target, RESULT& result) {
+    check_matrix_size(ref.matrix_size(), target.matrix_size(), result.matrix_size());
+    check_num_result_matrices(result.num_matrices(), target.num_matrices());
+
     for (auto i = 0; i < target.num_matrices(); ++i) {
         // TODO: Do in parallel
-        naive_cpu_cross_corr(ref.view(), target.view(i), valid_results.view(i));
+        naive_cpu_cross_corr(ref.view(), target.view(i), result.view(i));
     }
-    return validator<data_array<T>>(std::move(valid_results));
 }
 
 template<typename T, typename ALLOC>
-validator<data_array<T>> validate_with_computed_n_to_mn(const data_array<T, ALLOC>& ref, const data_array<T, ALLOC>& target) {
+data_array<T> cpu_cross_corr_one_to_many(const data_array<T, ALLOC>& ref, const data_array<T, ALLOC>& target) {
+    data_array<T> result{result_matrix_size(ref.matrix_size(), target.matrix_size()), target.num_matrices()};
+    cpu_cross_corr_one_to_many(ref, target, result);
+    return result;
+}
+
+template<typename REF, typename TARGET, typename RESULT>
+void cpu_cross_corr_n_to_mn(const REF& ref, const TARGET& target, RESULT& result) {
+    check_matrix_size(ref.matrix_size(), target.matrix_size(), result.matrix_size());
+    check_num_result_matrices(result.num_matrices(), target.num_matrices());
+
     if (target.num_matrices() % ref.num_matrices() != 0) {
         throw std::runtime_error(
             "Invalid ref and target data counts, "s +
@@ -183,22 +214,41 @@ validator<data_array<T>> validate_with_computed_n_to_mn(const data_array<T, ALLO
         );
     }
 
-    data_array<T> valid_results{ref.matrix_size() + target.matrix_size() - 1, target.num_matrices()};
-
     // TODO: Do in parallel
     for (auto r = 0; r < ref.num_matrices(); ++r) {
         for (auto t = 0; t < target.num_matrices() / ref.num_matrices() ; ++t) {
             auto t_matrix_index = t * ref.num_matrices() + r;
-            naive_cpu_cross_corr(ref.view(r), target.view(t_matrix_index), valid_results.view(t_matrix_index));
+            naive_cpu_cross_corr(ref.view(r), target.view(t_matrix_index), result.view(t_matrix_index));
         }
     }
-
-    return validator<data_array<T>>(std::move(valid_results));
 }
 
-template<typename DATA>
-validator<DATA> validate_with_precomputed(DATA&& valid_results) {
-    return validator<DATA>{std::move(valid_results)};
+template<typename T, typename ALLOC>
+data_array<T> cpu_cross_corr_n_to_mn(const data_array<T, ALLOC>& ref, const data_array<T, ALLOC>& target) {
+    data_array<T> result{result_matrix_size(ref.matrix_size(), target.matrix_size()), ref.num_matrices()};
+    cpu_cross_corr_n_to_mn(ref, target, result);
+    return result;
+}
+
+template<typename REF, typename TARGET, typename RESULT>
+void cpu_cross_corr_n_to_m(const REF& ref, const TARGET& target, RESULT& result) {
+    check_matrix_size(ref.matrix_size(), target.matrix_size(), result.matrix_size());
+    check_num_result_matrices(result.num_matrices(), ref.num_matrices() * target.num_matrices());
+
+    // TODO: Do in parallel
+    for (auto r = 0; r < ref.num_matrices(); ++r) {
+        for (auto t = 0; t < target.num_matrices(); ++t) {
+            auto result_matrix_index = r * target.num_matrices() + t;
+            naive_cpu_cross_corr(ref.view(r), target.view(t), result.view(result_matrix_index));
+        }
+    }
+}
+
+template<typename T, typename ALLOC>
+data_array<T> cpu_cross_corr_n_to_m(const data_array<T, ALLOC>& ref, const data_array<T, ALLOC>& target) {
+    data_array<T> result{result_matrix_size(ref.matrix_size(),target.matrix_size()), ref.num_matrices() * target.num_matrices()};
+    cpu_cross_corr_n_to_m(ref, target, result);
+    return result;
 }
 
 }
