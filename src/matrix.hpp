@@ -166,7 +166,7 @@ namespace impl {
         }
 
         inline void write_header(std::ostream& out, dsize2_t size, dsize_t num_matrices = 1) {
-            out << size.x << "," << size.y << "," << num_matrices << "\n";
+            out << "# " << size.x << "," << size.y << "," << num_matrices << "\n";
         }
 
         template <typename T>
@@ -425,35 +425,41 @@ public:
     { }
 
     template<typename PADDING>
-    static data_array<T, ALLOC> load_from_csv(std::vector<std::ifstream> in) {
-        std::vector<dsize2_t> sizes;
-        std::vector<dsize2_t> padded_sizes;
-        dsize_t total_data_size = 0;
-        for (auto&& i : in) {
-            auto [matrix_size, num_matrices] = impl::csv::read_header(i);
-            // TODO: Implement loading multiple matrices from file
-            if (num_matrices != 1) {
-                throw std::runtime_error{"Multi-file input contains more tahn one matrix per file"};
-            }
-            auto padded_size = PADDING::total_size(matrix_size);
-            sizes.push_back(matrix_size);
-            padded_sizes.push_back(padded_size);
-            total_data_size += padded_size.area();
+    static std::tuple<data_array<T, ALLOC>, std::vector<dsize_t>>  load_from_csv(std::vector<std::ifstream> in) {
+        std::optional<dsize2_t> matrix_size;
+        std::optional<dsize2_t> padded_size;
+        std::vector<dsize_t> num_matrices(in.size());
 
-            if (sizes.size() > 0 && sizes[0] != matrix_size) {
+        dsize_t total_data_size = 0;
+        dsize_t total_num_matrices = 0;
+        for (auto&& i : in) {
+            auto [in_matrix_size, in_num_matrices] = impl::csv::read_header(i);
+            auto in_padded_size = PADDING::total_size(in_matrix_size);
+            if (!matrix_size.has_value()) {
+                matrix_size = in_matrix_size;
+                padded_size = in_padded_size;
+            } else if (*matrix_size != in_matrix_size || *padded_size != in_padded_size) {
                 throw std::runtime_error{"Data array contains matrices of different sizes"};
             }
+            total_data_size += padded_size->area();
+            total_num_matrices += in_num_matrices;
+            num_matrices.push_back(in_num_matrices);
         }
 
 
         std::vector<T, ALLOC> data(total_data_size);
         auto mat_data = data.data();
         for (dsize_t i = 0; i < in.size(); ++i) {
-            impl::csv::read_data<T, PADDING>(in[i], sizes[i], padded_sizes[i], mat_data);
-            mat_data += padded_sizes[i].area();
+            for (dsize_t matrix = 0; matrix < num_matrices[i]; ++matrix) {
+                impl::csv::read_data<T, PADDING>(in[i], *matrix_size, *padded_size, mat_data);
+                mat_data += padded_size->area();
+            }
         }
 
-        return data_array<T, ALLOC>{padded_sizes[0], (dsize_t)sizes.size(), std::move(data)};
+        return {
+            data_array<T, ALLOC>{*padded_size, total_num_matrices, std::move(data)},
+            std::move(num_matrices)
+        };
     }
 
     template<typename PADDING>

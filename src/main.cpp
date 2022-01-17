@@ -50,15 +50,14 @@ using data_type = float;
 template<typename DATATYPE>
 void validate(
     const std::filesystem::path& target_path,
-    const std::filesystem::path& valid_path,
-    bool is_fft
+    const std::filesystem::path& valid_path
 ){
     std::ifstream target_file(target_path);
     std::ifstream valid_file(valid_path);
     auto target = data_array<DATATYPE>::template load_from_csv<no_padding>(target_file);
     auto valid = data_array<DATATYPE>::template load_from_csv<no_padding>(valid_file);
 
-    std::cout << compare_results(valid, target, is_fft);
+    std::cout << validate_result(valid, target);
 }
 
 template<typename ALG>
@@ -67,7 +66,8 @@ void run_measurement(
     const std::filesystem::path& def_path,
     const std::filesystem::path& out_path,
     const std::filesystem::path& measurements_path,
-    const po::variable_value& validate
+    const po::variable_value& validate,
+    bool normalize
 ) {
     ALG alg;
     std::cerr << "Loading inputs\n";
@@ -81,7 +81,15 @@ void run_measurement(
 
     auto res = alg.results();
     std::ofstream out_file(out_path);
-    res.store_to_csv(out_file);
+    if (alg.is_fft() && normalize) {
+        std::cerr << "Normalizing and storing results\n";
+        auto norm = normalize_fft_results(res);
+        norm.store_to_csv(out_file);
+    } else {
+        std::cerr << "Storing results\n";
+        res.store_to_csv(out_file);
+    }
+
 
     if (validate.empty()) {
         std::cerr << "No validation\n";
@@ -110,7 +118,8 @@ static std::unordered_map<std::string, std::function<void(
     const std::filesystem::path&,
     const std::filesystem::path&,
     const std::filesystem::path&,
-    const po::variable_value& validate
+    const po::variable_value& validate,
+    bool
 )>> algorithms{
     {"cpu_one_one", run_measurement<cpu_one_to_one<data_type, false>>},
     {"cpu_one_many", run_measurement<cpu_one_to_many<data_type, false>>},
@@ -123,7 +132,7 @@ static std::unordered_map<std::string, std::function<void(
     {"nai_rows_256", run_measurement<naive_ring_buffer_row_alg<data_type, 256, false, pinned_allocator<data_type>>>},
     {"nai_def_block_128", run_measurement<naive_def_per_block<data_type, 128, false, pinned_allocator<data_type>>>},
     {"nai_def_block_256", run_measurement<naive_def_per_block<data_type, 256, false, pinned_allocator<data_type>>>},
-    {"fft_orig", run_measurement<fft_original_alg<data_type, false, pinned_allocator<data_type>>>}
+    {"fft_orig_one_one", run_measurement<fft_original_alg<data_type, false, pinned_allocator<data_type>>>}
 };
 
 void print_help(std::ostream& out, const std::string& name, const po::options_description& options) {
@@ -177,6 +186,7 @@ int main(int argc, char **argv) {
             ("out,o", po::value<std::filesystem::path>(&out_path)->default_value(out_path))
             ("times,t", po::value<std::filesystem::path>(&measurements_path)->default_value(measurements_path))
             ("validate,v", po::value<std::filesystem::path>()->implicit_value(""))
+            ("normalize,n", "If algorithm is fft, normalize the results")
             ;
 
         po::options_description run_pos_opts;
@@ -241,7 +251,7 @@ int main(int argc, char **argv) {
             }
 
             auto validate = vm["validate"];
-            fnc->second(ref_path, target_path, out_path, measurements_path, validate);
+            fnc->second(ref_path, target_path, out_path, measurements_path, validate, vm.count("normalize") != 0);
             return 0;
         } else if (cmd == "validate") {
             std::vector<std::string> opts = po::collect_unrecognized(parsed.options, po::include_positional);
@@ -256,8 +266,7 @@ int main(int argc, char **argv) {
             );
             po::notify(vm);
 
-            // TODO: FFT results
-            validate<double>(target_path, ref_path, false);
+            validate<double>(target_path, ref_path);
             return 0;
         } else {
             std::cerr << "Unknown command " << cmd << "\n";

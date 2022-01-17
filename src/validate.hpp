@@ -130,17 +130,6 @@ validation_results validate_result(const MAT1& result, const MAT2& valid_result)
 
 }
 
-template<typename RESULTS, typename VALID>
-validation_results compare_results(const RESULTS& results, const VALID& valid_results, bool is_fft) {
-    if (is_fft) {
-        auto norm = normalize_fft_results(results);
-        return validate_result(norm, valid_results);
-    }
-    else {
-        return validate_result(results, valid_results);
-    }
-}
-
 inline dsize2_t result_matrix_size(dsize2_t ref_size, dsize2_t target_size) {
     return ref_size + target_size - 1;
 }

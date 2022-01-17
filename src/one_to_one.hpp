@@ -244,7 +244,7 @@ template<typename T, bool DEBUG = false, typename ALLOC = std::allocator<T>>
 class fft_original_alg: public one_to_one<T, ALLOC> {
 public:
     fft_original_alg()
-        :one_to_one<T, ALLOC>(true, labels.size()), ref_(), target_(), res_(), fft_buffer_size_(0)
+        :one_to_one<T, ALLOC>(true, labels.size()), ref_(), target_(), result_(), fft_buffer_size_(0)
     {
 
     }
@@ -258,7 +258,7 @@ public:
     }
 
     const data_array<T, ALLOC>& results() const override {
-        return res_;
+        return result_;
     }
 
     const std::vector<std::string>& measurement_labels() const override {
@@ -271,77 +271,87 @@ protected:
         ref_ = load_matrix_from_csv<T, relative_zero_padding<2>, ALLOC>(ref_path);
         target_ = load_matrix_from_csv<T, relative_zero_padding<2>, ALLOC>(target_path);
 
-        if (DEBUG)
-        {
-            std::ofstream out_file("../data/ref.csv");
-            ref_.store_to_csv(out_file);
-
-            out_file = std::ofstream("../data/target.csv");
-            target_.store_to_csv(out_file);
+        if (ref_.matrix_size() != target_.matrix_size()) {
+            throw std::runtime_error(
+                "Invalid input matrix sizes, expected ref and target to be the same size: ref = "s +
+                to_string(ref_.matrix_size()) +
+                " target = "s +
+                to_string(target_.matrix_size())
+            );
         }
 
+        // if (DEBUG)
+        // {
+        //     std::ofstream out_file("../data/ref.csv");
+        //     ref_.store_to_csv(out_file);
 
-        res_ = data_array<T, ALLOC>{ref_.matrix_size()};
+        //     out_file = std::ofstream("../data/target.csv");
+        //     target_.store_to_csv(out_file);
+        // }
+
+        // Input matrices are padded with zeroes to twice their size
+        // so that we can just do FFT, hadamard and inverse and have the resutls
+        result_ = data_array<T, ALLOC>{ref_.matrix_size()};
+
         fft_buffer_size_ = ref_.matrix_size().y * (ref_.matrix_size().x / 2 + 1);
 
-        cuda_malloc(&d_ref_, ref_.size());
-        cuda_malloc(&d_target_, target_.size());
-        cuda_malloc(&d_res_, res_.size());
+        cuda_malloc(&d_inputs_, ref_.size() + target_.size());
+        cuda_malloc(&d_result_, result_.size());
 
-        cuda_malloc(&d_ref_fft_, fft_buffer_size_);
-        cuda_malloc(&d_target_fft_, fft_buffer_size_);
+        // 2 * as we have two input matrices we are doing FFT on
+        cuda_malloc(&d_inputs_fft_, 2 * fft_buffer_size_);
 
-        cuda_memcpy_to_device(d_ref_, ref_);
-        cuda_memcpy_to_device(d_target_, target_);
+        cuda_memcpy_to_device(d_inputs_, ref_);
+        cuda_memcpy_to_device(d_inputs_ + ref_.size(), target_);
 
-
-        FFTCH(cufftPlan2d(&fft_plan_, ref_.matrix_size().y, ref_.matrix_size().x, fft_type_R2C<T>()));
-        FFTCH(cufftPlan2d(&fft_inv_plan_, ref_.matrix_size().y, ref_.matrix_size().x, fft_type_C2R<T>()));
+        int sizes[2] = {static_cast<int>(ref_.matrix_size().y), static_cast<int>(ref_.matrix_size().x)};
+        // With nullptr inembed and onembed, the values for istride, idist, ostride and odist are ignored
+        FFTCH(cufftPlanMany(&fft_plan_, 2, sizes, nullptr, 1, 0, nullptr, 1, 0, fft_type_R2C<T>(), 2));
+        FFTCH(cufftPlan2d(&fft_inv_plan_, result_.matrix_size().y, result_.matrix_size().x, fft_type_C2R<T>()));
     }
 
     void run_impl() override {
-        CPU_MEASURE(0,
-            fft_real_to_complex(fft_plan_, d_ref_, d_ref_fft_);
-            fft_real_to_complex(fft_plan_, d_target_, d_target_fft_);
+        CPU_MEASURE(1,
+            fft_real_to_complex(fft_plan_, d_inputs_, d_inputs_fft_);
         );
 
-        if (DEBUG)
-        {
-            std::vector<fft_complex_t> tmp(fft_buffer_size_);
-            cuda_memcpy_from_device(tmp.data(), d_ref_fft_, tmp.size());
+        // if (DEBUG)
+        // {
+        //     std::vector<fft_complex_t> tmp(fft_buffer_size_);
+        //     cuda_memcpy_from_device(tmp.data(), d_ref_fft_, tmp.size());
 
-            std::ofstream out("../data/ref_fft.csv");
-            out << tmp << std::endl;
+        //     std::ofstream out("../data/ref_fft.csv");
+        //     out << tmp << std::endl;
 
-            cuda_memcpy_from_device(tmp.data(), d_target_fft_, tmp.size());
+        //     cuda_memcpy_from_device(tmp.data(), d_target_fft_, tmp.size());
 
-            out = std::ofstream("../data/target_fft.csv");
-            out << tmp << std::endl;
-        }
+        //     out = std::ofstream("../data/target_fft.csv");
+        //     out << tmp << std::endl;
+        // }
 
 
-        CUDA_MEASURE(1,
+        CUDA_MEASURE(2,
             run_hadamard_original(
-                d_ref_fft_,
-                d_target_fft_,
+                d_inputs_fft_,
+                d_inputs_fft_ + fft_buffer_size_,
                 {ref_.matrix_size().y, (ref_.matrix_size().x / 2) + 1},
                 1,
                 1,
                 256)
         );
 
-        if (DEBUG)
-        {
-            CUCH(cudaDeviceSynchronize());
-            std::vector<fft_complex_t> tmp(fft_buffer_size_);
-            cuda_memcpy_from_device(tmp.data(), d_target_fft_, tmp.size());
+        // if (DEBUG)
+        // {
+        //     CUCH(cudaDeviceSynchronize());
+        //     std::vector<fft_complex_t> tmp(fft_buffer_size_);
+        //     cuda_memcpy_from_device(tmp.data(), d_target_fft_, tmp.size());
 
-            std::ofstream out("../data/hadamard.csv");
-            out << tmp << std::endl;
-        }
+        //     std::ofstream out("../data/hadamard.csv");
+        //     out << tmp << std::endl;
+        // }
 
-        CUDA_MEASURE(2,
-            fft_complex_to_real(fft_inv_plan_, d_target_fft_, d_res_)
+        CUDA_MEASURE(3,
+            fft_complex_to_real(fft_inv_plan_, d_inputs_fft_ + fft_buffer_size_, d_result_)
         );
 
         CUCH(cudaDeviceSynchronize());
@@ -349,7 +359,7 @@ protected:
     }
 
     void finalize_impl() override {
-        cuda_memcpy_from_device(res_, d_res_);
+        cuda_memcpy_from_device(result_, d_result_);
     }
 
 private:
@@ -360,20 +370,17 @@ private:
 
     data_array<T, ALLOC> ref_;
     data_array<T, ALLOC> target_;
+    data_array<T, ALLOC> result_;
 
-    data_array<T, ALLOC> res_;
-
-    T* d_ref_;
-    T* d_target_;
-    T* d_res_;
+    T* d_inputs_;
+    T* d_result_;
 
     cufftHandle fft_plan_;
     cufftHandle fft_inv_plan_;
 
     dsize_t fft_buffer_size_;
 
-    fft_complex_t* d_ref_fft_;
-    fft_complex_t* d_target_fft_;
+    fft_complex_t* d_inputs_fft_;
 };
 
 template<typename T, bool DEBUG, typename ALLOC>

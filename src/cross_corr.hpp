@@ -24,7 +24,7 @@ using sw_clock = std::chrono::high_resolution_clock;
  * Load matrix array from many csv files, one matrix per csv file
  */
 template<typename T, typename PADDING, typename ALLOC = std::allocator<T>>
-data_array<T,ALLOC> load_matrix_array_from_csv(const std::vector<std::filesystem::path>& paths) {
+std::tuple<data_array<T,ALLOC>, std::vector<dsize_t>> load_matrix_array_from_multiple_csv(const std::vector<std::filesystem::path>& paths) {
     std::vector<std::ifstream> inputs(paths.size());
     for (auto&& path: paths) {
         inputs.push_back(std::ifstream{path});
@@ -81,13 +81,12 @@ public:
 
 
     validation_results validate(const std::optional<std::filesystem::path>& valid_data_path = std::nullopt) const {
-        if (valid_data_path.has_value()) {
-            auto valid_data = load_matrix_array_from_csv<T, no_padding>(*valid_data_path);
-            return compare_results(valid_data, this->results(), this->is_fft());
+        auto valid = valid_results(valid_data_path);
+        if (this->is_fft()) {
+            return validate_result(normalize_fft_results(this->results()), valid);
         } else {
-            return compare_results(get_valid_results(), this->results(), this->is_fft());
+            return validate_result(this->results(), valid);
         }
-        return validation_results{};
     }
 
 
@@ -115,6 +114,16 @@ protected:
     }
 
     sw_clock::time_point start_;
+
+private:
+    data_array<T> valid_results(const std::optional<std::filesystem::path>& valid_data_path = std::nullopt) const {
+        if (valid_data_path.has_value()) {
+            return load_matrix_array_from_csv<T, no_padding>(*valid_data_path);
+        } else {
+            return get_valid_results();
+        }
+
+    }
 };
 
 
