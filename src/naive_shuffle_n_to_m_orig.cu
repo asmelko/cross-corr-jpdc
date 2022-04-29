@@ -16,7 +16,8 @@
 
 namespace cg = cooperative_groups;
 
-namespace cross {
+namespace cross::orig {
+
 
 constexpr unsigned int warp_size = 32;
 constexpr dsize_t max_num_left_matrices = 4;
@@ -33,9 +34,9 @@ constexpr dsize_t max_num_right_matrices = 4;
  */
 template<typename T, typename RES>
 struct warp_shuffle_impl_args {
-    const T* __restrict__ left;
-    const T* __restrict__ right;
-    RES* __restrict__ out;
+    const T *__restrict__ left;
+    const T *__restrict__ right;
+    RES *__restrict__ out;
     dsize2_t warp_right_start;
     dsize2_t warp_right_end;
     vec2<int> warp_min_shift;
@@ -45,9 +46,9 @@ struct warp_shuffle_impl_args {
     dsize_t num_right_matrices;
 
     __device__ warp_shuffle_impl_args(
-        const T* __restrict__ left,
-        const T* __restrict__ right,
-        RES* __restrict__ out,
+        const T *__restrict__ left,
+        const T *__restrict__ right,
+        RES *__restrict__ out,
         dsize2_t warp_right_start,
         dsize2_t warp_right_end,
         vec2<int> warp_min_shift,
@@ -55,19 +56,18 @@ struct warp_shuffle_impl_args {
         dsize2_t matrix_size,
         dsize2_t search_size,
         dsize_t num_right_matrices
-    )   : left(left), right(right), out(out), warp_right_start(warp_right_start),
-    warp_right_end(warp_right_end), warp_min_shift(warp_min_shift), output_pos(output_pos),
-    matrix_size(matrix_size), search_size(search_size), num_right_matrices(num_right_matrices)
-    {
+    ) : left(left), right(right), out(out), warp_right_start(warp_right_start),
+        warp_right_end(warp_right_end), warp_min_shift(warp_min_shift), output_pos(output_pos),
+        matrix_size(matrix_size), search_size(search_size), num_right_matrices(num_right_matrices) {
 
     }
 };
 
 template<typename T, typename RES>
 __device__ warp_shuffle_impl_args<T, RES> create_warp_shuffle_impl_args(
-    const T* __restrict__ left,
-    const T* __restrict__ right,
-    RES* __restrict__ out,
+    const T *__restrict__ left,
+    const T *__restrict__ right,
+    RES *__restrict__ out,
     dsize2_t warp_right_start,
     dsize2_t warp_right_end,
     vec2<int> warp_min_shift,
@@ -90,13 +90,10 @@ __device__ warp_shuffle_impl_args<T, RES> create_warp_shuffle_impl_args(
     );
 }
 
-#define L(rl, num_lefts) ((rl) % (num_lefts))
-#define R(rl, num_lefts) ((rl) / (num_lefts))
-
 template<dsize_t NUM_LEFTS, dsize_t NUM_RIGHTS, bool ATOMIC, dsize_t WARP_SIZE, typename T, typename RES>
 __device__ void warp_shuffle_impl(
-    const cg::thread_block_tile<WARP_SIZE>& warp,
-    const warp_shuffle_impl_args<T, RES>& args
+    const cg::thread_block_tile <WARP_SIZE> &warp,
+    const warp_shuffle_impl_args<T, RES> &args
 ) {
     // Compute the given shift for num_rights right matrices
     RES sum[NUM_LEFTS * NUM_RIGHTS];
@@ -110,8 +107,8 @@ __device__ void warp_shuffle_impl(
         dsize_t warp_y_left = warp_y_right + args.warp_min_shift.y;
 
         const dsize_t right_row_offset = warp_y_right * args.matrix_size.x;
-        const T* left_row = args.left + warp_y_left * args.matrix_size.x;
-        const T* right_row = args.right + right_row_offset;
+        const T *left_row = args.left + warp_y_left * args.matrix_size.x;
+        const T *right_row = args.right + right_row_offset;
 
         int warp_x_left = static_cast<int>(args.warp_right_start.x) + args.warp_min_shift.x;
 
@@ -128,10 +125,10 @@ __device__ void warp_shuffle_impl(
 
 
         for (
-                dsize_t warp_x_right = args.warp_right_start.x;
-                warp_x_right < args.warp_right_end.x;
-                warp_x_right += warp.size(), warp_x_left += warp.size()
-                ) {
+            dsize_t warp_x_right = args.warp_right_start.x;
+            warp_x_right < args.warp_right_end.x;
+            warp_x_right += warp.size(), warp_x_left += warp.size()
+            ) {
 
             // Load next warp_size values
             // Load 0 if out of bounds
@@ -150,7 +147,9 @@ __device__ void warp_shuffle_impl(
             #pragma unroll
             for (dsize_t r = 0; r < NUM_RIGHTS; ++r) {
                 // TODO: Either do bounds check or limit the for loop below
-                thread_right[r] = load_with_bounds_check(right_row + r * args.matrix_size.area(), right_idx, args.matrix_size.x);
+                thread_right[r] = load_with_bounds_check(
+                    right_row + r * args.matrix_size.area(), right_idx, args.matrix_size.x
+                );
             }
 
             T thread_left_top[NUM_LEFTS];
@@ -165,33 +164,29 @@ __device__ void warp_shuffle_impl(
 
             // TODO: Maybe pragma unroll?
             for (dsize_t i = 0; i < warp.size(); ++i) {
-                //  Merged two nested for loops into a single for loop which may be easier for compiler to unroll
+                // TODO: Merge into a single for loop which may be easier for compiler to unroll
                 //  and derive the r and l variables using modulo and division
-                T right_val;
                 #pragma unroll
-                for (dsize_t rl = 0; rl < NUM_LEFTS * NUM_RIGHTS; ++rl) {
-                    //
-                    if (L(rl, NUM_LEFTS) == 0) {
-                        right_val = warp.shfl(thread_right[R(rl, NUM_LEFTS)], i);
-                    }
+                for (dsize_t r = 0; r < NUM_RIGHTS; ++r) {
+                    // Broadcast
+                    auto right_val = warp.shfl(thread_right[r], i);
 
-                    // No need to mask, if either values is out of bounds the value will be 0
-                    sum[L(rl, NUM_LEFTS) * NUM_RIGHTS + R(rl, NUM_LEFTS)] += thread_left_bottom[L(rl, NUM_LEFTS)] * right_val;
+                    #pragma unroll
+                    for (dsize_t l = 0; l < NUM_LEFTS; ++l) {
+                        // No need to mask, if either values is out of bounds the value will be 0
+                        sum[l * NUM_RIGHTS + r] += thread_left_bottom[l] * right_val;
+                    }
                 }
 
                 #pragma unroll
                 for (dsize_t l = 0; l < NUM_LEFTS; ++l) {
-                    T bottom_shift_val;
-                    if (warp.thread_rank() != 0) {
-                        bottom_shift_val = thread_left_bottom[l];
-                    } else {
-                        // Lane 0 pushes the bottom-most value of the top buffer to the top of the bottom buffer
-                        //  making it behave as one continuous buffer
-                        bottom_shift_val = thread_left_top[l];
-                    }
                     // Shuffle does modulo srcLane automatically
-                    thread_left_bottom[l] = warp.shfl(bottom_shift_val, warp.thread_rank() + 1);
-
+                    // Lane 0 pushes the bottom-most value of the top buffer to the top of the bottom buffer
+                    //  making it behave as one continuous buffer
+                    thread_left_bottom[l] = warp.shfl(
+                        warp.thread_rank() != 0 ? thread_left_bottom[l] : thread_left_top[l],
+                        warp.thread_rank() + 1
+                    );
                     thread_left_top[l] = warp.shfl_down(thread_left_top[l], 1);
                 }
             }
@@ -200,25 +195,29 @@ __device__ void warp_shuffle_impl(
 
     if (args.output_pos.x < args.search_size.x && args.output_pos.y < args.search_size.y) {
         auto output_offset = args.output_pos.linear_idx(args.search_size.x);
-        // Merge two nested for loops into a single for loop which may be easier for compiler to unroll
+        // TODO: Merge into a single for loop which may be easier for compiler to unroll
         //  and derive the r and l variables using modulo and division
         #pragma unroll
-        for (dsize_t rl = 0; rl < NUM_LEFTS * NUM_RIGHTS; ++rl) {
-            T* matrix = args.out + (L(rl, NUM_LEFTS) * args.num_right_matrices + R(rl, NUM_LEFTS)) * args.search_size.area();
-            if (ATOMIC) {
-                atomicAdd(matrix + output_offset, sum[L(rl, NUM_LEFTS) * NUM_RIGHTS + R(rl, NUM_LEFTS)]);
-            } else {
-                matrix[output_offset] = sum[L(rl, NUM_LEFTS) * NUM_RIGHTS + R(rl, NUM_LEFTS)];
+        for (dsize_t l = 0; l < NUM_LEFTS; ++l) {
+            #pragma unroll
+            for (dsize_t r = 0; r < NUM_RIGHTS; ++r) {
+                T *matrix = args.out + (l * args.num_right_matrices + r) * args.search_size.area();
+                if (ATOMIC) {
+                    atomicAdd(matrix + output_offset, sum[l * NUM_RIGHTS + r]);
+                } else {
+                    matrix[output_offset] = sum[l * NUM_RIGHTS + r];
+                }
             }
         }
     }
 }
 
+// TODO: Is this correct?
 template<dsize_t NUM_LEFTS, dsize_t NUM_RIGHTS, bool ATOMIC, dsize_t WARP_SIZE, typename T, typename RES>
 __device__ void warp_shuffle_impl_dispatch_num_rights(
-    const cg::thread_block_tile<WARP_SIZE>& warp,
+    const cg::thread_block_tile <WARP_SIZE> &warp,
     dsize_t thread_num_rights,
-    const warp_shuffle_impl_args<T, RES>& args
+    const warp_shuffle_impl_args<T, RES> &args
 ) {
     if constexpr(NUM_RIGHTS == 0) {
         assert(false);
@@ -238,12 +237,13 @@ __device__ void warp_shuffle_impl_dispatch_num_rights(
     }
 }
 
+// TODO: Is this correct?
 template<dsize_t NUM_LEFTS, dsize_t NUM_RIGHTS, bool ATOMIC, dsize_t WARP_SIZE, typename T, typename RES>
 __device__ void warp_shuffle_impl_dispatch_num_lefts(
-    const cg::thread_block_tile<WARP_SIZE>& warp,
+    const cg::thread_block_tile <WARP_SIZE> &warp,
     dsize_t thread_num_lefts,
     dsize_t thread_num_rights,
-    const warp_shuffle_impl_args<T, RES>& args
+    const warp_shuffle_impl_args<T, RES> &args
 ) {
     if constexpr(NUM_LEFTS == 0) {
         assert(false);
@@ -279,9 +279,9 @@ __device__ void warp_shuffle_impl_dispatch_num_lefts(
  */
 template<typename DIST, typename T, typename RES>
 __global__ void ccn_warp_shuffle_n_to_m_work_distribution(
-    const T* __restrict__ left,
-    const T* __restrict__ right,
-    RES* __restrict__ out,
+    const T *__restrict__ left,
+    const T *__restrict__ right,
+    RES *__restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
     dsize_t num_left_matrices,
@@ -337,7 +337,7 @@ __global__ void ccn_warp_shuffle_n_to_m_work_distribution(
     }
 
     // All warps of given block start at the same x, but each work on different row of output
-    dsize2_t thread0_out_pos = dsize2_t {
+    dsize2_t thread0_out_pos = dsize2_t{
         warp_output_x_offset,
         work.output_row
     };
@@ -396,7 +396,9 @@ __global__ void ccn_warp_shuffle_n_to_m_work_distribution(
     dsize_t warp_y_right_end = min(warp_y_right_start + rows_per_worker, shared_y_right_end);
 
     dsize_t thread_num_left_matrices = min(num_left_matrices - left_matrix_group_start_idx, left_matrices_per_thread);
-    dsize_t thread_num_right_matrices = min(num_right_matrices - right_matrix_group_start_idx, right_matrices_per_thread);
+    dsize_t thread_num_right_matrices = min(
+        num_right_matrices - right_matrix_group_start_idx, right_matrices_per_thread
+    );
 
     auto args = create_warp_shuffle_impl_args(
         left + left_matrix_group_start_idx * matrix_size.area(),
@@ -419,11 +421,12 @@ __global__ void ccn_warp_shuffle_n_to_m_work_distribution(
     );
 }
 
+
 template<typename DIST, typename T, typename RES>
 void run_ccn_warp_shuffle_n_to_m_work_distribution(
-    const T* __restrict__ left,
-    const T* __restrict__ right,
-    RES* __restrict__ out,
+    const T *__restrict__ left,
+    const T *__restrict__ right,
+    RES *__restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
     dsize_t num_left_matrices,
@@ -438,20 +441,22 @@ void run_ccn_warp_shuffle_n_to_m_work_distribution(
     }
 
     if (left_matrices_per_thread > max_num_left_matrices) {
-        throw std::runtime_error("Too many left matrices per thread: "s +
-                                 std::to_string(right_matrices_per_thread) +
-                                 " (max "s +
-                                 std::to_string(max_num_left_matrices) +
-                                 ")"s
+        throw std::runtime_error(
+            "Too many left matrices per thread: "s +
+            std::to_string(right_matrices_per_thread) +
+            " (max "s +
+            std::to_string(max_num_left_matrices) +
+            ")"s
         );
     }
 
     if (right_matrices_per_thread > max_num_right_matrices) {
-        throw std::runtime_error("Too many right matrices per thread: "s +
-                                 std::to_string(right_matrices_per_thread) +
-                                 " (max "s +
-                                 std::to_string(max_num_right_matrices) +
-                                 ")"s
+        throw std::runtime_error(
+            "Too many right matrices per thread: "s +
+            std::to_string(right_matrices_per_thread) +
+            " (max "s +
+            std::to_string(max_num_right_matrices) +
+            ")"s
         );
     }
 
@@ -492,9 +497,9 @@ void run_ccn_warp_shuffle_n_to_m_work_distribution(
 }
 
 template void run_ccn_warp_shuffle_n_to_m_work_distribution<triangle_distribution, int, int>(
-    const int* __restrict__ left,
-    const int* __restrict__ right,
-    int* __restrict__ out,
+    const int *__restrict__ left,
+    const int *__restrict__ right,
+    int *__restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
     dsize_t num_left_matrices,
@@ -506,9 +511,9 @@ template void run_ccn_warp_shuffle_n_to_m_work_distribution<triangle_distributio
 );
 
 template void run_ccn_warp_shuffle_n_to_m_work_distribution<triangle_distribution, float, float>(
-    const float* __restrict__ left,
-    const float* __restrict__ right,
-    float* __restrict__ out,
+    const float *__restrict__ left,
+    const float *__restrict__ right,
+    float *__restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
     dsize_t num_left_matrices,
@@ -520,9 +525,9 @@ template void run_ccn_warp_shuffle_n_to_m_work_distribution<triangle_distributio
 );
 
 template void run_ccn_warp_shuffle_n_to_m_work_distribution<triangle_distribution, double, double>(
-    const double* __restrict__ left,
-    const double* __restrict__ right,
-    double* __restrict__ out,
+    const double *__restrict__ left,
+    const double *__restrict__ right,
+    double *__restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
     dsize_t num_left_matrices,
@@ -534,9 +539,9 @@ template void run_ccn_warp_shuffle_n_to_m_work_distribution<triangle_distributio
 );
 
 template void run_ccn_warp_shuffle_n_to_m_work_distribution<rectangle_distribution, int, int>(
-    const int* __restrict__ left,
-    const int* __restrict__ right,
-    int* __restrict__ out,
+    const int *__restrict__ left,
+    const int *__restrict__ right,
+    int *__restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
     dsize_t num_left_matrices,
@@ -548,9 +553,9 @@ template void run_ccn_warp_shuffle_n_to_m_work_distribution<rectangle_distributi
 );
 
 template void run_ccn_warp_shuffle_n_to_m_work_distribution<rectangle_distribution, float, float>(
-    const float* __restrict__ left,
-    const float* __restrict__ right,
-    float* __restrict__ out,
+    const float *__restrict__ left,
+    const float *__restrict__ right,
+    float *__restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
     dsize_t num_left_matrices,
@@ -562,9 +567,9 @@ template void run_ccn_warp_shuffle_n_to_m_work_distribution<rectangle_distributi
 );
 
 template void run_ccn_warp_shuffle_n_to_m_work_distribution<rectangle_distribution, double, double>(
-    const double* __restrict__ left,
-    const double* __restrict__ right,
-    double* __restrict__ out,
+    const double *__restrict__ left,
+    const double *__restrict__ right,
+    double *__restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
     dsize_t num_left_matrices,
@@ -576,9 +581,9 @@ template void run_ccn_warp_shuffle_n_to_m_work_distribution<rectangle_distributi
 );
 
 template void run_ccn_warp_shuffle_n_to_m_work_distribution<no_distribution, int, int>(
-    const int* __restrict__ left,
-    const int* __restrict__ right,
-    int* __restrict__ out,
+    const int *__restrict__ left,
+    const int *__restrict__ right,
+    int *__restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
     dsize_t num_left_matrices,
@@ -590,9 +595,9 @@ template void run_ccn_warp_shuffle_n_to_m_work_distribution<no_distribution, int
 );
 
 template void run_ccn_warp_shuffle_n_to_m_work_distribution<no_distribution, float, float>(
-    const float* __restrict__ left,
-    const float* __restrict__ right,
-    float* __restrict__ out,
+    const float *__restrict__ left,
+    const float *__restrict__ right,
+    float *__restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
     dsize_t num_left_matrices,
@@ -604,9 +609,9 @@ template void run_ccn_warp_shuffle_n_to_m_work_distribution<no_distribution, flo
 );
 
 template void run_ccn_warp_shuffle_n_to_m_work_distribution<no_distribution, double, double>(
-    const double* __restrict__ left,
-    const double* __restrict__ right,
-    double* __restrict__ out,
+    const double *__restrict__ left,
+    const double *__restrict__ right,
+    double *__restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
     dsize_t num_left_matrices,
