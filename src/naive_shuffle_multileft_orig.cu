@@ -18,7 +18,7 @@
 
 namespace cg = cooperative_groups;
 
-namespace cross {
+namespace cross::orig {
 
 namespace {
 
@@ -192,22 +192,13 @@ __device__ void compute_row_group(
 
             #pragma unroll
             for (dsize_t l = 0; l < NUM_LEFT_ROWS; ++l) {
-
-                // This if cannot be changed into ternary operator
-                // as nvcc fails to optimize the two arrays into registers
-                // and instead puts them into local memory when ternary operator
-                // is used
-                T bottom_shift_val;
-                if (warp.thread_rank() != 0) {
-                    bottom_shift_val = thread_left_bottom[l];
-                } else {
-                    // Lane 0 pushes the bottom-most value of the top buffer to the top of the bottom buffer
-                    //  making it behave as one continuous buffer
-                    bottom_shift_val = thread_left_top[l];
-                }
                 // Shuffle does modulo srcLane automatically
-                thread_left_bottom[l] = warp.shfl(bottom_shift_val, warp.thread_rank() + 1);
-
+                // Lane 0 pushes the bottom-most value of the top buffer to the top of the bottom buffer
+                //  making it behave as one continuous buffer
+                thread_left_bottom[l] = warp.shfl(
+                    warp.thread_rank() != 0 ? thread_left_bottom[l] : thread_left_top[l],
+                    warp.thread_rank() + 1
+                );
                 thread_left_top[l] = warp.shfl_down(thread_left_top[l], 1);
             }
         }
@@ -276,10 +267,10 @@ __device__ void startup(
         startup<NUM_THREAD_SHIFTS + 1, MAX_NUM_THREAD_SHIFTS>(ctb, warp, args, res);
     } else {
         // Silence the unused parameter warning
-        (void)ctb;
-        (void)warp;
-        (void)args;
-        (void)res;
+        (void) ctb;
+        (void) warp;
+        (void) args;
+        (void) res;
     }
 }
 
@@ -304,10 +295,10 @@ __device__ void wind_down(
         wind_down<NUM_THREAD_SHIFTS - 1, MAX_NUM_THREAD_SHIFTS>(ctb, warp, args, res);
     } else {
         // Silence the unused parameter warning
-        (void)ctb;
-        (void)warp;
-        (void)args;
-        (void)res;
+        (void) ctb;
+        (void) warp;
+        (void) args;
+        (void) res;
     }
 }
 
@@ -392,11 +383,11 @@ __device__ void multileft_shuffle_impl_dispatch(
         // Zero is valid, if the warp is completely outside the result matrix
 
         // Silence the unused parameter warning
-        (void)ctb;
-        (void)warp;
-        (void)num_thread_shifts;
-        (void)args;
-        (void)res;
+        (void) ctb;
+        (void) warp;
+        (void) num_thread_shifts;
+        (void) args;
+        (void) res;
     } else {
         if (NUM_THREAD_SHIFTS == num_thread_shifts) {
             multileft_shuffle_impl<NUM_THREAD_SHIFTS, MAX_LEFT_ROWS, ATOMIC>(
@@ -457,7 +448,7 @@ __global__ void ccn_multileft_shuffle(
     cg::thread_block_tile<warp_size> warp = cg::tiled_partition<warp_size>(ctb);
 
     // All warps of given block start at the same x, but each work on different row of output
-    dsize2_t thread0_out_pos{
+    dsize2_t thread0_out_pos = dsize2_t{
         ctb.group_index().x * ctb.group_dim().x,
         (ctb.group_index().y * ctb.group_dim().y + ctb.thread_index().y) * max_shifts_per_thread
     };
@@ -484,8 +475,7 @@ __global__ void ccn_multileft_shuffle(
     //
     // It is clamped into search size as matrix may not be of size divisible by warp_size
     vec2<int> warp_max_shift = {
-        static_cast<int>(min(last_warp_thread_out_pos.x, search_size.x - 1)) -
-        static_cast<int>(half_search_size.x),
+        static_cast<int>(min(last_warp_thread_out_pos.x, search_size.x - 1)) - static_cast<int>(half_search_size.x),
         // max_right_rows - 1 because + max_right_rows is the min_shift of next warp
         static_cast<int>(min(last_warp_thread_out_pos.y + max_shifts_per_thread - 1, search_size.y - 1)) -
         static_cast<int>(half_search_size.y)
@@ -564,9 +554,9 @@ __host__ void ccn_multileft_shuffle_dispatch(
             );
 
             dsize_t block_size = num_threads.x * num_threads.y;
-            dsize_t shared_mem_size = block_size * max_shifts_per_thread * sizeof(RES);
 
-            ccn_multileft_shuffle<MAX_LEFT_ROWS><<<num_blocks, num_threads, shared_mem_size>>>(
+            ccn_multileft_shuffle<MAX_LEFT_ROWS><<<num_blocks, num_threads, block_size * max_shifts_per_thread *
+                                                                            sizeof(RES)>>>(
                 left,
                 right,
                 out,
@@ -587,17 +577,17 @@ __host__ void ccn_multileft_shuffle_dispatch(
             );
         }
     } else {
-        // TODO: Solve the -Wunused-but-set-parameter warning
+        // TODO: Solve the -Wunused-but-set-parameter warining
         // Silence the confusing -Wunused-but-set-parameter warning
         // as we are not setting the parameters anywhere
-        (void)left;
-        (void)right;
-        (void)out;
-        (void)matrix_size;
-        (void)search_size;
-        (void)cuda_rows_per_block;
-        (void)max_shifts_per_thread;
-        (void)max_left_rows;
+        (void) left;
+        (void) right;
+        (void) out;
+        (void) matrix_size;
+        (void) search_size;
+        (void) cuda_rows_per_block;
+        (void) max_shifts_per_thread;
+        (void) max_left_rows;
         assert(false);
     }
 }
