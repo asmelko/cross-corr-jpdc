@@ -22,7 +22,7 @@ namespace cross {
 
 namespace {
 
-constexpr dsize_t right_rows_limit = SHUFFLE_MULTIROW_RIGHT_ROWS_LIMIT;
+constexpr dsize_t right_rows_limit = SHUFFLE_MULTIROW_RIGHT_RIGHT_ROWS_LIMIT;
 
 /**
  * Arguments for the warp_shuffle_impl function.
@@ -270,7 +270,7 @@ __device__ void wind_down(
 }
 
 template<dsize_t NUM_RIGHT_ROWS, bool ATOMIC, dsize_t WARP_SIZE, typename T, typename RES>
-__device__ void multirow_shuffle_impl(
+__device__ void shuffle_multirow_right_impl(
     const cg::thread_block& ctb,
     const cg::thread_block_tile<WARP_SIZE>& warp,
     warp_shuffle_impl_args<T, RES> args,
@@ -319,7 +319,7 @@ __device__ void multirow_shuffle_impl(
 }
 
 template<dsize_t RIGHT_ROWS_PER_THREAD, bool ATOMIC, dsize_t WARP_SIZE, typename T, typename RES>
-__device__ void multirow_shuffle_impl_dispatch(
+__device__ void shuffle_multirow_right_impl_dispatch(
     const cg::thread_block& ctb,
     const cg::thread_block_tile<WARP_SIZE>& warp,
     dsize_t right_rows_per_thread,
@@ -338,14 +338,14 @@ __device__ void multirow_shuffle_impl_dispatch(
 
     } else {
         if (RIGHT_ROWS_PER_THREAD == right_rows_per_thread) {
-            multirow_shuffle_impl<RIGHT_ROWS_PER_THREAD, ATOMIC>(
+            shuffle_multirow_right_impl<RIGHT_ROWS_PER_THREAD, ATOMIC>(
                 ctb,
                 warp,
                 args,
                 res
             );
         } else {
-            multirow_shuffle_impl_dispatch<RIGHT_ROWS_PER_THREAD - 1, ATOMIC>(
+            shuffle_multirow_right_impl_dispatch<RIGHT_ROWS_PER_THREAD - 1, ATOMIC>(
                 ctb,
                 warp,
                 right_rows_per_thread,
@@ -363,7 +363,7 @@ __device__ void multirow_shuffle_impl_dispatch(
  * and then always loads 32 values
  */
 template<dsize_t MAX_RIGHT_ROWS_PER_THREAD, typename T, typename RES>
-__global__ void ccn_multirow_shuffle(
+__global__ void ccn_shuffle_multirow_right(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -470,7 +470,7 @@ __global__ void ccn_multirow_shuffle(
         search_size
     );
 
-    multirow_shuffle_impl_dispatch<MAX_RIGHT_ROWS_PER_THREAD, false>(
+    shuffle_multirow_right_impl_dispatch<MAX_RIGHT_ROWS_PER_THREAD, false>(
         ctb,
         warp,
         warp_num_right_rows,
@@ -480,7 +480,7 @@ __global__ void ccn_multirow_shuffle(
 }
 
 template<dsize_t MAX_RIGHT_ROWS_PER_THREAD, typename T, typename RES>
-__host__ void ccn_multirow_shuffle_dispatch(
+__host__ void ccn_shuffle_multirow_right_dispatch(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -499,7 +499,7 @@ __host__ void ccn_multirow_shuffle_dispatch(
 
             dsize_t block_size = num_threads.x * num_threads.y;
 
-            ccn_multirow_shuffle<MAX_RIGHT_ROWS_PER_THREAD><<<num_blocks, num_threads, block_size * MAX_RIGHT_ROWS_PER_THREAD * sizeof(RES)>>>(
+            ccn_shuffle_multirow_right<MAX_RIGHT_ROWS_PER_THREAD><<<num_blocks, num_threads, block_size * MAX_RIGHT_ROWS_PER_THREAD * sizeof(RES)>>>(
                 left,
                 right,
                 out,
@@ -507,7 +507,7 @@ __host__ void ccn_multirow_shuffle_dispatch(
                 search_size
             );
         } else {
-            ccn_multirow_shuffle_dispatch<MAX_RIGHT_ROWS_PER_THREAD - 1>(
+            ccn_shuffle_multirow_right_dispatch<MAX_RIGHT_ROWS_PER_THREAD - 1>(
                 left,
                 right,
                 out,
@@ -535,7 +535,7 @@ __host__ void ccn_multirow_shuffle_dispatch(
 } // END anonymous namespace
 
 template<typename T, typename RES>
-void run_ccn_multirow_shuffle(
+void run_ccn_shuffle_multirow_right(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -557,7 +557,7 @@ void run_ccn_multirow_shuffle(
         );
     }
 
-    ccn_multirow_shuffle_dispatch<right_rows_limit>(
+    ccn_shuffle_multirow_right_dispatch<right_rows_limit>(
         left,
         right,
         out,
@@ -568,7 +568,7 @@ void run_ccn_multirow_shuffle(
     );
 }
 
-template void run_ccn_multirow_shuffle<int, int>(
+template void run_ccn_shuffle_multirow_right<int, int>(
         const int* __restrict__ left,
         const int* __restrict__ right,
         int* __restrict__ out,
@@ -578,7 +578,7 @@ template void run_ccn_multirow_shuffle<int, int>(
         dsize_t right_rows_per_thread
 );
 
-template void run_ccn_multirow_shuffle<float, float>(
+template void run_ccn_shuffle_multirow_right<float, float>(
         const float* __restrict__ left,
         const float* __restrict__ right,
         float* __restrict__ out,
@@ -588,7 +588,7 @@ template void run_ccn_multirow_shuffle<float, float>(
         dsize_t right_rows_per_thread
 );
 
-template void run_ccn_multirow_shuffle<double, double>(
+template void run_ccn_shuffle_multirow_right<double, double>(
         const double* __restrict__ left,
         const double* __restrict__ right,
         double* __restrict__ out,

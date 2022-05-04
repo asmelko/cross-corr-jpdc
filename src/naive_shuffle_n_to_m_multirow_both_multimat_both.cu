@@ -22,10 +22,10 @@ namespace cross {
 
 namespace {
 
-constexpr dsize_t shifts_per_thread_per_right_matrix_limit = SHUFFLE_N_TO_M_MULTIROW_SHIFTS_PER_THREAD_PER_RIGHT_MATRIX_LIMIT;
-constexpr dsize_t right_matrices_per_thread_limit = SHUFFLE_N_TO_M_MULTIROW_RIGHT_MATRICES_PER_THREAD_LIMIT;
-constexpr dsize_t left_matrices_per_thread_limit = SHUFFLE_N_TO_M_MULTIROW_LEFT_MATRICES_PER_THREAD_LIMIT;
-constexpr dsize_t left_rows_per_iteration_limit = SHUFFLE_N_TO_M_MULTIROW_LEFT_ROWS_PER_ITERATION_LIMIT;
+constexpr dsize_t shifts_per_thread_per_right_matrix_limit = SHUFFLE_N_TO_M_MULTIROW_BOTH_MULTIMAT_BOTH_SHIFTS_PER_THREAD_PER_RIGHT_MATRIX_LIMIT;
+constexpr dsize_t right_matrices_per_thread_limit = SHUFFLE_N_TO_M_MULTIROW_BOTH_MULTIMAT_BOTH_RIGHT_MATRICES_PER_THREAD_LIMIT;
+constexpr dsize_t left_matrices_per_thread_limit = SHUFFLE_N_TO_M_MULTIROW_BOTH_MULTIMAT_BOTH_LEFT_MATRICES_PER_THREAD_LIMIT;
+constexpr dsize_t left_rows_per_iteration_limit = SHUFFLE_N_TO_M_MULTIROW_BOTH_MULTIMAT_BOTH_LEFT_ROWS_PER_ITERATION_LIMIT;
 
 /**
  * Arguments for the warp_shuffle_impl function.
@@ -357,7 +357,7 @@ __device__ void wind_down(
 
 
 template<dsize_t NUM_SHIFTS_PER_RIGHT_MAT, dsize_t NUM_RIGHT_MATS, dsize_t NUM_LEFT_MATS, dsize_t LEFT_ROWS_PER_ITER, bool ATOMIC, dsize_t WARP_SIZE, typename T, typename RES>
-__device__ void n_to_m_shuffle_impl(
+__device__ void n_to_m_shuffle_multirow_both_multimat_both_impl(
     const cg::thread_block& ctb,
     const cg::thread_block_tile<WARP_SIZE>& warp,
     const warp_shuffle_impl_args<T, RES>& args,
@@ -427,7 +427,7 @@ __device__ void n_to_m_shuffle_impl(
 }
 
 template<dsize_t NUM_SHIFTS_PER_RIGHT_MAT, dsize_t NUM_RIGHT_MATS, dsize_t NUM_LEFT_MATS, dsize_t LEFT_ROWS_PER_ITER, bool ATOMIC, dsize_t WARP_SIZE, typename T, typename RES>
-__device__ void n_to_m_shuffle_impl_left_mats_dispatch(
+__device__ void n_to_m_shuffle_multirow_both_multimat_both_impl_left_mats_dispatch(
     const cg::thread_block& ctb,
     const cg::thread_block_tile<WARP_SIZE>& warp,
     dsize_t num_left_mats,
@@ -444,14 +444,14 @@ __device__ void n_to_m_shuffle_impl_left_mats_dispatch(
         assert(false);
     } else {
         if (NUM_LEFT_MATS == num_left_mats) {
-            n_to_m_shuffle_impl<NUM_SHIFTS_PER_RIGHT_MAT, NUM_RIGHT_MATS, NUM_LEFT_MATS, LEFT_ROWS_PER_ITER, ATOMIC>(
+            n_to_m_shuffle_multirow_both_multimat_both_impl<NUM_SHIFTS_PER_RIGHT_MAT, NUM_RIGHT_MATS, NUM_LEFT_MATS, LEFT_ROWS_PER_ITER, ATOMIC>(
                 ctb,
                 warp,
                 args,
                 res
             );
         } else {
-            n_to_m_shuffle_impl_left_mats_dispatch<NUM_SHIFTS_PER_RIGHT_MAT, NUM_RIGHT_MATS, NUM_LEFT_MATS - 1, LEFT_ROWS_PER_ITER, ATOMIC>(
+            n_to_m_shuffle_multirow_both_multimat_both_impl_left_mats_dispatch<NUM_SHIFTS_PER_RIGHT_MAT, NUM_RIGHT_MATS, NUM_LEFT_MATS - 1, LEFT_ROWS_PER_ITER, ATOMIC>(
                 ctb,
                 warp,
                 num_left_mats,
@@ -463,7 +463,7 @@ __device__ void n_to_m_shuffle_impl_left_mats_dispatch(
 }
 
 template<dsize_t NUM_SHIFTS_PER_RIGHT_MAT, dsize_t NUM_RIGHT_MATS, dsize_t NUM_LEFT_MATS, dsize_t LEFT_ROWS_PER_ITER, bool ATOMIC, dsize_t WARP_SIZE, typename T, typename RES>
-__device__ void n_to_m_shuffle_impl_right_mats_dispatch(
+__device__ void n_to_m_shuffle_multirow_both_multimat_both_impl_right_mats_dispatch(
     const cg::thread_block& ctb,
     const cg::thread_block_tile<WARP_SIZE>& warp,
     dsize_t num_left_mats,
@@ -482,7 +482,7 @@ __device__ void n_to_m_shuffle_impl_right_mats_dispatch(
         assert(false);
     } else {
         if (NUM_RIGHT_MATS == num_right_mats) {
-            n_to_m_shuffle_impl_left_mats_dispatch<NUM_SHIFTS_PER_RIGHT_MAT, NUM_RIGHT_MATS, NUM_LEFT_MATS, LEFT_ROWS_PER_ITER, ATOMIC>(
+            n_to_m_shuffle_multirow_both_multimat_both_impl_left_mats_dispatch<NUM_SHIFTS_PER_RIGHT_MAT, NUM_RIGHT_MATS, NUM_LEFT_MATS, LEFT_ROWS_PER_ITER, ATOMIC>(
                 ctb,
                 warp,
                 num_left_mats,
@@ -490,7 +490,7 @@ __device__ void n_to_m_shuffle_impl_right_mats_dispatch(
                 res
             );
         } else {
-            n_to_m_shuffle_impl_right_mats_dispatch<NUM_SHIFTS_PER_RIGHT_MAT, NUM_RIGHT_MATS - 1, NUM_LEFT_MATS, LEFT_ROWS_PER_ITER, ATOMIC>(
+            n_to_m_shuffle_multirow_both_multimat_both_impl_right_mats_dispatch<NUM_SHIFTS_PER_RIGHT_MAT, NUM_RIGHT_MATS - 1, NUM_LEFT_MATS, LEFT_ROWS_PER_ITER, ATOMIC>(
                 ctb,
                 warp,
                 num_left_mats,
@@ -503,7 +503,7 @@ __device__ void n_to_m_shuffle_impl_right_mats_dispatch(
 }
 
 template<dsize_t NUM_SHIFTS_PER_RIGHT_MAT, dsize_t NUM_RIGHT_MATS, dsize_t NUM_LEFT_MATS, dsize_t LEFT_ROWS_PER_ITER, bool ATOMIC, dsize_t WARP_SIZE, typename T, typename RES>
-__device__ void n_to_m_shuffle_impl_shifts_dispatch(
+__device__ void n_to_m_shuffle_multirow_both_multimat_both_impl_shifts_dispatch(
     const cg::thread_block& ctb,
     const cg::thread_block_tile<WARP_SIZE>& warp,
     dsize_t num_shifts_per_right_mat,
@@ -524,7 +524,7 @@ __device__ void n_to_m_shuffle_impl_shifts_dispatch(
         assert(false);
     } else {
         if (NUM_SHIFTS_PER_RIGHT_MAT == num_shifts_per_right_mat) {
-            n_to_m_shuffle_impl_right_mats_dispatch<NUM_SHIFTS_PER_RIGHT_MAT, NUM_RIGHT_MATS, NUM_LEFT_MATS, LEFT_ROWS_PER_ITER, ATOMIC>(
+            n_to_m_shuffle_multirow_both_multimat_both_impl_right_mats_dispatch<NUM_SHIFTS_PER_RIGHT_MAT, NUM_RIGHT_MATS, NUM_LEFT_MATS, LEFT_ROWS_PER_ITER, ATOMIC>(
                 ctb,
                 warp,
                 num_left_mats,
@@ -533,7 +533,7 @@ __device__ void n_to_m_shuffle_impl_shifts_dispatch(
                 res
             );
         } else {
-            n_to_m_shuffle_impl_shifts_dispatch<NUM_SHIFTS_PER_RIGHT_MAT - 1, NUM_RIGHT_MATS, NUM_LEFT_MATS, LEFT_ROWS_PER_ITER, ATOMIC>(
+            n_to_m_shuffle_multirow_both_multimat_both_impl_shifts_dispatch<NUM_SHIFTS_PER_RIGHT_MAT - 1, NUM_RIGHT_MATS, NUM_LEFT_MATS, LEFT_ROWS_PER_ITER, ATOMIC>(
                 ctb,
                 warp,
                 num_shifts_per_right_mat,
@@ -559,7 +559,7 @@ __device__ void n_to_m_shuffle_impl_shifts_dispatch(
  * @param search_size
  */
 template<dsize_t MAX_SHIFTS_PER_RIGHT_MATRIX, dsize_t MAX_RIGHT_MATRICES_PER_THREAD, dsize_t MAX_LEFT_MATRICES_PER_THREAD, dsize_t LEFT_ROWS_PER_ITER, typename T, typename RES>
-__global__ void ccn_n_to_m_shuffle_multirow(
+__global__ void ccn_n_to_m_shuffle_multirow_both_multimat_both(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -681,7 +681,7 @@ __global__ void ccn_n_to_m_shuffle_multirow(
         num_right_matrices
     );
 
-    n_to_m_shuffle_impl_shifts_dispatch<MAX_SHIFTS_PER_RIGHT_MATRIX, MAX_RIGHT_MATRICES_PER_THREAD, MAX_LEFT_MATRICES_PER_THREAD, LEFT_ROWS_PER_ITER, false>(
+    n_to_m_shuffle_multirow_both_multimat_both_impl_shifts_dispatch<MAX_SHIFTS_PER_RIGHT_MATRIX, MAX_RIGHT_MATRICES_PER_THREAD, MAX_LEFT_MATRICES_PER_THREAD, LEFT_ROWS_PER_ITER, false>(
         ctb,
         warp,
         warp_num_shifts_per_right_mat,
@@ -693,7 +693,7 @@ __global__ void ccn_n_to_m_shuffle_multirow(
 }
 
 template<dsize_t MAX_SHIFTS_PER_RIGHT_MATRIX, dsize_t MAX_RIGHT_MATRICES_PER_THREAD, dsize_t MAX_LEFT_MATRICES_PER_THREAD, dsize_t LEFT_ROWS_PER_ITER, typename T, typename RES>
-__host__ void ccn_n_to_m_shuffle_multirow_left_rows_dispatch(
+__host__ void ccn_n_to_m_shuffle_multirow_both_multimat_both_left_rows_dispatch(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -730,7 +730,7 @@ __host__ void ccn_n_to_m_shuffle_multirow_left_rows_dispatch(
             dsize_t block_size = num_threads.x * num_threads.y;
             dsize_t shared_mem_size = block_size * MAX_SHIFTS_PER_RIGHT_MATRIX * MAX_RIGHT_MATRICES_PER_THREAD * MAX_LEFT_MATRICES_PER_THREAD * sizeof(RES);
 
-            ccn_n_to_m_shuffle_multirow<MAX_SHIFTS_PER_RIGHT_MATRIX, MAX_RIGHT_MATRICES_PER_THREAD, MAX_LEFT_MATRICES_PER_THREAD, LEFT_ROWS_PER_ITER><<<num_blocks, num_threads, shared_mem_size>>>(
+            ccn_n_to_m_shuffle_multirow_both_multimat_both<MAX_SHIFTS_PER_RIGHT_MATRIX, MAX_RIGHT_MATRICES_PER_THREAD, MAX_LEFT_MATRICES_PER_THREAD, LEFT_ROWS_PER_ITER><<<num_blocks, num_threads, shared_mem_size>>>(
                 left,
                 right,
                 out,
@@ -740,7 +740,7 @@ __host__ void ccn_n_to_m_shuffle_multirow_left_rows_dispatch(
                 num_right_matrices
             );
         } else {
-            ccn_n_to_m_shuffle_multirow_left_rows_dispatch<MAX_SHIFTS_PER_RIGHT_MATRIX, MAX_RIGHT_MATRICES_PER_THREAD, MAX_LEFT_MATRICES_PER_THREAD, LEFT_ROWS_PER_ITER - 1>(
+            ccn_n_to_m_shuffle_multirow_both_multimat_both_left_rows_dispatch<MAX_SHIFTS_PER_RIGHT_MATRIX, MAX_RIGHT_MATRICES_PER_THREAD, MAX_LEFT_MATRICES_PER_THREAD, LEFT_ROWS_PER_ITER - 1>(
                 left,
                 right,
                 out,
@@ -770,7 +770,7 @@ __host__ void ccn_n_to_m_shuffle_multirow_left_rows_dispatch(
 }
 
 template<dsize_t MAX_SHIFTS_PER_RIGHT_MATRIX, dsize_t MAX_RIGHT_MATRICES_PER_THREAD, dsize_t MAX_LEFT_MATRICES_PER_THREAD, dsize_t LEFT_ROWS_PER_ITER, typename T, typename RES>
-__host__ void ccn_n_to_m_shuffle_multirow_left_mats_dispatch(
+__host__ void ccn_n_to_m_shuffle_multirow_both_multimat_both_left_mats_dispatch(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -784,7 +784,7 @@ __host__ void ccn_n_to_m_shuffle_multirow_left_mats_dispatch(
 ) {
     if constexpr(MAX_LEFT_MATRICES_PER_THREAD > 0) {
         if (MAX_LEFT_MATRICES_PER_THREAD == left_matrices_per_thread) {
-            ccn_n_to_m_shuffle_multirow_left_rows_dispatch<MAX_SHIFTS_PER_RIGHT_MATRIX, MAX_RIGHT_MATRICES_PER_THREAD, MAX_LEFT_MATRICES_PER_THREAD, LEFT_ROWS_PER_ITER>(
+            ccn_n_to_m_shuffle_multirow_both_multimat_both_left_rows_dispatch<MAX_SHIFTS_PER_RIGHT_MATRIX, MAX_RIGHT_MATRICES_PER_THREAD, MAX_LEFT_MATRICES_PER_THREAD, LEFT_ROWS_PER_ITER>(
                 left,
                 right,
                 out,
@@ -796,7 +796,7 @@ __host__ void ccn_n_to_m_shuffle_multirow_left_mats_dispatch(
                 left_rows_per_iteration
             );
         } else {
-            ccn_n_to_m_shuffle_multirow_left_mats_dispatch<MAX_SHIFTS_PER_RIGHT_MATRIX, MAX_RIGHT_MATRICES_PER_THREAD, MAX_LEFT_MATRICES_PER_THREAD - 1, LEFT_ROWS_PER_ITER>(
+            ccn_n_to_m_shuffle_multirow_both_multimat_both_left_mats_dispatch<MAX_SHIFTS_PER_RIGHT_MATRIX, MAX_RIGHT_MATRICES_PER_THREAD, MAX_LEFT_MATRICES_PER_THREAD - 1, LEFT_ROWS_PER_ITER>(
                 left,
                 right,
                 out,
@@ -828,7 +828,7 @@ __host__ void ccn_n_to_m_shuffle_multirow_left_mats_dispatch(
 }
 
 template<dsize_t MAX_SHIFTS_PER_RIGHT_MATRIX, dsize_t MAX_RIGHT_MATRICES_PER_THREAD, dsize_t MAX_LEFT_MATRICES_PER_THREAD, dsize_t LEFT_ROWS_PER_ITER, typename T, typename RES>
-__host__ void ccn_n_to_m_shuffle_multirow_right_mats_dispatch(
+__host__ void ccn_n_to_m_shuffle_multirow_both_multimat_both_right_mats_dispatch(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -843,7 +843,7 @@ __host__ void ccn_n_to_m_shuffle_multirow_right_mats_dispatch(
 ) {
     if constexpr(MAX_RIGHT_MATRICES_PER_THREAD > 0) {
         if (MAX_RIGHT_MATRICES_PER_THREAD == right_matrices_per_thread) {
-            ccn_n_to_m_shuffle_multirow_left_mats_dispatch<MAX_SHIFTS_PER_RIGHT_MATRIX, MAX_RIGHT_MATRICES_PER_THREAD, MAX_LEFT_MATRICES_PER_THREAD, LEFT_ROWS_PER_ITER>(
+            ccn_n_to_m_shuffle_multirow_both_multimat_both_left_mats_dispatch<MAX_SHIFTS_PER_RIGHT_MATRIX, MAX_RIGHT_MATRICES_PER_THREAD, MAX_LEFT_MATRICES_PER_THREAD, LEFT_ROWS_PER_ITER>(
                 left,
                 right,
                 out,
@@ -856,7 +856,7 @@ __host__ void ccn_n_to_m_shuffle_multirow_right_mats_dispatch(
                 left_rows_per_iteration
             );
         } else {
-            ccn_n_to_m_shuffle_multirow_right_mats_dispatch<MAX_SHIFTS_PER_RIGHT_MATRIX, MAX_RIGHT_MATRICES_PER_THREAD - 1, MAX_LEFT_MATRICES_PER_THREAD, LEFT_ROWS_PER_ITER>(
+            ccn_n_to_m_shuffle_multirow_both_multimat_both_right_mats_dispatch<MAX_SHIFTS_PER_RIGHT_MATRIX, MAX_RIGHT_MATRICES_PER_THREAD - 1, MAX_LEFT_MATRICES_PER_THREAD, LEFT_ROWS_PER_ITER>(
                 left,
                 right,
                 out,
@@ -890,7 +890,7 @@ __host__ void ccn_n_to_m_shuffle_multirow_right_mats_dispatch(
 }
 
 template<dsize_t MAX_SHIFTS_PER_RIGHT_MATRIX, dsize_t MAX_RIGHT_MATRICES_PER_THREAD, dsize_t MAX_LEFT_MATRICES_PER_THREAD, dsize_t LEFT_ROWS_PER_ITER, typename T, typename RES>
-__host__ void ccn_n_to_m_shuffle_multirow_shifts_dispatch(
+__host__ void ccn_n_to_m_shuffle_multirow_both_multimat_both_shifts_dispatch(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -906,7 +906,7 @@ __host__ void ccn_n_to_m_shuffle_multirow_shifts_dispatch(
 ) {
     if constexpr(MAX_SHIFTS_PER_RIGHT_MATRIX > 0) {
         if (MAX_SHIFTS_PER_RIGHT_MATRIX == shifts_per_thread_right_matrix) {
-            ccn_n_to_m_shuffle_multirow_right_mats_dispatch<MAX_SHIFTS_PER_RIGHT_MATRIX, MAX_RIGHT_MATRICES_PER_THREAD, MAX_LEFT_MATRICES_PER_THREAD, LEFT_ROWS_PER_ITER>(
+            ccn_n_to_m_shuffle_multirow_both_multimat_both_right_mats_dispatch<MAX_SHIFTS_PER_RIGHT_MATRIX, MAX_RIGHT_MATRICES_PER_THREAD, MAX_LEFT_MATRICES_PER_THREAD, LEFT_ROWS_PER_ITER>(
                 left,
                 right,
                 out,
@@ -920,7 +920,7 @@ __host__ void ccn_n_to_m_shuffle_multirow_shifts_dispatch(
                 left_rows_per_iteration
             );
         } else {
-            ccn_n_to_m_shuffle_multirow_shifts_dispatch<MAX_SHIFTS_PER_RIGHT_MATRIX - 1, MAX_RIGHT_MATRICES_PER_THREAD, MAX_LEFT_MATRICES_PER_THREAD, LEFT_ROWS_PER_ITER>(
+            ccn_n_to_m_shuffle_multirow_both_multimat_both_shifts_dispatch<MAX_SHIFTS_PER_RIGHT_MATRIX - 1, MAX_RIGHT_MATRICES_PER_THREAD, MAX_LEFT_MATRICES_PER_THREAD, LEFT_ROWS_PER_ITER>(
                 left,
                 right,
                 out,
@@ -959,7 +959,7 @@ __host__ void ccn_n_to_m_shuffle_multirow_shifts_dispatch(
 } // END anonymous namespace
 
 template<typename T, typename RES>
-void run_ccn_n_to_m_shuffle_multirow(
+void run_ccn_n_to_m_shuffle_multirow_both_multimat_both(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -1013,7 +1013,7 @@ void run_ccn_n_to_m_shuffle_multirow(
         );
     }
 
-    ccn_n_to_m_shuffle_multirow_shifts_dispatch<shifts_per_thread_per_right_matrix_limit, right_matrices_per_thread_limit, left_matrices_per_thread_limit, left_rows_per_iteration_limit>(
+    ccn_n_to_m_shuffle_multirow_both_multimat_both_shifts_dispatch<shifts_per_thread_per_right_matrix_limit, right_matrices_per_thread_limit, left_matrices_per_thread_limit, left_rows_per_iteration_limit>(
         left,
         right,
         out,
@@ -1029,7 +1029,7 @@ void run_ccn_n_to_m_shuffle_multirow(
     );
 }
 
-template void run_ccn_n_to_m_shuffle_multirow<int, int>(
+template void run_ccn_n_to_m_shuffle_multirow_both_multimat_both<int, int>(
     const int* __restrict__ left,
     const int* __restrict__ right,
     int* __restrict__ out,
@@ -1044,7 +1044,7 @@ template void run_ccn_n_to_m_shuffle_multirow<int, int>(
     dsize_t left_rows_per_iteration
 );
 
-template void run_ccn_n_to_m_shuffle_multirow<float, float>(
+template void run_ccn_n_to_m_shuffle_multirow_both_multimat_both<float, float>(
     const float* __restrict__ left,
     const float* __restrict__ right,
     float* __restrict__ out,
@@ -1059,7 +1059,7 @@ template void run_ccn_n_to_m_shuffle_multirow<float, float>(
     dsize_t left_rows_per_iteration
 );
 
-template void run_ccn_n_to_m_shuffle_multirow<double, double>(
+template void run_ccn_n_to_m_shuffle_multirow_both_multimat_both<double, double>(
     const double* __restrict__ left,
     const double* __restrict__ right,
     double* __restrict__ out,

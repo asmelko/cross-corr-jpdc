@@ -392,7 +392,7 @@ __device__ void shared_mem_rows_impl_dispatch(
  * @param shared_mem_buffer_size
  */
 template<dsize_t MAX_RIGHT_MATRICES_PER_BLOCK,bool STRIDED_LOAD, typename T, typename RES>
-__global__ void ccn_shift_per_warp_shared_mem(
+__global__ void ccn_warp_per_shift_shared_mem(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -499,7 +499,7 @@ __global__ void ccn_shift_per_warp_shared_mem(
 }
 
 template<dsize_t MAX_RIGHT_MATRICES_PER_BLOCK, typename T, typename RES>
-__host__ void ccn_shift_per_warp_shared_mem_right_mats_dispatch(
+__host__ void ccn_warp_per_shift_shared_mem_right_mats_dispatch(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -531,7 +531,7 @@ __host__ void ccn_shift_per_warp_shared_mem_right_mats_dispatch(
             dsize_t shared_mem_size = (2 + right_matrices_per_block) * shared_mem_buffer_size;
 
             if (strided_load) {
-                ccn_shift_per_warp_shared_mem<MAX_RIGHT_MATRICES_PER_BLOCK, true><<<num_blocks, num_threads, shared_mem_size>>>(
+                ccn_warp_per_shift_shared_mem<MAX_RIGHT_MATRICES_PER_BLOCK, true><<<num_blocks, num_threads, shared_mem_size>>>(
                     left,
                     right,
                     out,
@@ -542,7 +542,7 @@ __host__ void ccn_shift_per_warp_shared_mem_right_mats_dispatch(
                     shared_mem_rows
                 );
             } else {
-                ccn_shift_per_warp_shared_mem<MAX_RIGHT_MATRICES_PER_BLOCK, false><<<num_blocks, num_threads, shared_mem_size>>>(
+                ccn_warp_per_shift_shared_mem<MAX_RIGHT_MATRICES_PER_BLOCK, false><<<num_blocks, num_threads, shared_mem_size>>>(
                     left,
                     right,
                     out,
@@ -554,7 +554,7 @@ __host__ void ccn_shift_per_warp_shared_mem_right_mats_dispatch(
                 );
             }
         } else {
-            ccn_shift_per_warp_shared_mem_right_mats_dispatch<MAX_RIGHT_MATRICES_PER_BLOCK - 1>(
+            ccn_warp_per_shift_shared_mem_right_mats_dispatch<MAX_RIGHT_MATRICES_PER_BLOCK - 1>(
                 left,
                 right,
                 out,
@@ -593,7 +593,7 @@ __host__ void ccn_shift_per_warp_shared_mem_right_mats_dispatch(
 
 
 template<typename T, typename RES>
-void run_ccn_shift_per_warp_shared_mem(
+void run_ccn_warp_per_shift_shared_mem(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -620,7 +620,7 @@ void run_ccn_shift_per_warp_shared_mem(
         );
     }
 
-    ccn_shift_per_warp_shared_mem_right_mats_dispatch<right_matrices_per_block_limit>(
+    ccn_warp_per_shift_shared_mem_right_mats_dispatch<right_matrices_per_block_limit>(
         left,
         right,
         out,
@@ -636,7 +636,7 @@ void run_ccn_shift_per_warp_shared_mem(
     );
 }
 
-template void run_ccn_shift_per_warp_shared_mem<int, int>(
+template void run_ccn_warp_per_shift_shared_mem<int, int>(
     const int* __restrict__ left,
     const int* __restrict__ right,
     int* __restrict__ out,
@@ -651,7 +651,7 @@ template void run_ccn_shift_per_warp_shared_mem<int, int>(
     bool column_group_per_block
 );
 
-template void run_ccn_shift_per_warp_shared_mem<float, float>(
+template void run_ccn_warp_per_shift_shared_mem<float, float>(
     const float* __restrict__ left,
     const float* __restrict__ right,
     float* __restrict__ out,
@@ -666,7 +666,7 @@ template void run_ccn_shift_per_warp_shared_mem<float, float>(
     bool column_group_per_block
 );
 
-template void run_ccn_shift_per_warp_shared_mem<double, double>(
+template void run_ccn_warp_per_shift_shared_mem<double, double>(
     const double* __restrict__ left,
     const double* __restrict__ right,
     double* __restrict__ out,

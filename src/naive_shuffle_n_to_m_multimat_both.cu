@@ -21,8 +21,8 @@ namespace cross {
 
 namespace {
 
-constexpr dsize_t left_matrices_per_thread_limit = SHUFFLE_N_TO_M_LEFT_MATRICES_PER_THREAD_LIMIT;
-constexpr dsize_t right_matrices_per_thread_limit = SHUFFLE_N_TO_M_RIGHT_MATRICES_PER_THREAD_LIMIT;
+constexpr dsize_t left_matrices_per_thread_limit = SHUFFLE_N_TO_M_MULTIMAT_BOTH_LEFT_MATRICES_PER_THREAD_LIMIT;
+constexpr dsize_t right_matrices_per_thread_limit = SHUFFLE_N_TO_M_MULTIMAT_BOTH_RIGHT_MATRICES_PER_THREAD_LIMIT;
 
 /**
  * Arguments for the warp_shuffle_impl function.
@@ -291,7 +291,7 @@ __device__ void warp_shuffle_impl_dispatch_num_lefts(
  * @param search_size
  */
 template<dsize_t MAX_LEFT_MATRICES_PER_THREAD, dsize_t MAX_RIGHT_MATRICES_PER_THREAD, typename DIST, typename T, typename RES>
-__global__ void ccn_warp_shuffle_n_to_m_work_distribution(
+__global__ void ccn_shuffle_n_to_m_multimat_both_work_distribution(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -433,7 +433,7 @@ __global__ void ccn_warp_shuffle_n_to_m_work_distribution(
 }
 
 template<dsize_t MAX_LEFT_MATRICES_PER_THREAD, dsize_t MAX_RIGHT_MATRICES_PER_THREAD, typename DIST, typename T, typename RES>
-__host__ void ccn_warp_shuffle_n_to_m_work_distribution_right_mat_dispatch(
+__host__ void ccn_shuffle_n_to_m_multimat_both_work_distribution_right_mat_dispatch(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -469,7 +469,7 @@ __host__ void ccn_warp_shuffle_n_to_m_work_distribution_right_mat_dispatch(
                 div_up(num_workers, num_threads.y)
             );
 
-            ccn_warp_shuffle_n_to_m_work_distribution<MAX_LEFT_MATRICES_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD, DIST><<<num_blocks, num_threads>>>(
+            ccn_shuffle_n_to_m_multimat_both_work_distribution<MAX_LEFT_MATRICES_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD, DIST><<<num_blocks, num_threads>>>(
                 left,
                 right,
                 out,
@@ -480,7 +480,7 @@ __host__ void ccn_warp_shuffle_n_to_m_work_distribution_right_mat_dispatch(
                 max_rows_per_thread
             );
         } else {
-            ccn_warp_shuffle_n_to_m_work_distribution_right_mat_dispatch<MAX_LEFT_MATRICES_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD - 1, DIST>(
+            ccn_shuffle_n_to_m_multimat_both_work_distribution_right_mat_dispatch<MAX_LEFT_MATRICES_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD - 1, DIST>(
                 left,
                 right,
                 out,
@@ -512,7 +512,7 @@ __host__ void ccn_warp_shuffle_n_to_m_work_distribution_right_mat_dispatch(
 }
 
 template<dsize_t MAX_LEFT_MATRICES_PER_THREAD, dsize_t MAX_RIGHT_MATRICES_PER_THREAD, typename DIST, typename T, typename RES>
-__host__ void ccn_warp_shuffle_n_to_m_work_distribution_left_mat_dispatch(
+__host__ void ccn_shuffle_n_to_m_multimat_both_work_distribution_left_mat_dispatch(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -527,7 +527,7 @@ __host__ void ccn_warp_shuffle_n_to_m_work_distribution_left_mat_dispatch(
 ) {
     if constexpr(MAX_LEFT_MATRICES_PER_THREAD > 0) {
         if (MAX_LEFT_MATRICES_PER_THREAD == left_matrices_per_thread) {
-            ccn_warp_shuffle_n_to_m_work_distribution_right_mat_dispatch<MAX_LEFT_MATRICES_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD, DIST>(
+            ccn_shuffle_n_to_m_multimat_both_work_distribution_right_mat_dispatch<MAX_LEFT_MATRICES_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD, DIST>(
                 left,
                 right,
                 out,
@@ -540,7 +540,7 @@ __host__ void ccn_warp_shuffle_n_to_m_work_distribution_left_mat_dispatch(
                 max_rows_per_thread
             );
         } else {
-            ccn_warp_shuffle_n_to_m_work_distribution_left_mat_dispatch<MAX_LEFT_MATRICES_PER_THREAD - 1, MAX_RIGHT_MATRICES_PER_THREAD, DIST>(
+            ccn_shuffle_n_to_m_multimat_both_work_distribution_left_mat_dispatch<MAX_LEFT_MATRICES_PER_THREAD - 1, MAX_RIGHT_MATRICES_PER_THREAD, DIST>(
                 left,
                 right,
                 out,
@@ -577,7 +577,7 @@ __host__ void ccn_warp_shuffle_n_to_m_work_distribution_left_mat_dispatch(
 } // END anonymous namespace
 
 template<typename DIST, typename T, typename RES>
-void run_ccn_warp_shuffle_n_to_m_work_distribution(
+void run_ccn_shuffle_n_to_m_multimat_both_work_distribution(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -612,7 +612,7 @@ void run_ccn_warp_shuffle_n_to_m_work_distribution(
         );
     }
 
-    ccn_warp_shuffle_n_to_m_work_distribution_left_mat_dispatch<left_matrices_per_thread_limit, right_matrices_per_thread_limit, DIST>(
+    ccn_shuffle_n_to_m_multimat_both_work_distribution_left_mat_dispatch<left_matrices_per_thread_limit, right_matrices_per_thread_limit, DIST>(
         left,
         right,
         out,
@@ -627,7 +627,7 @@ void run_ccn_warp_shuffle_n_to_m_work_distribution(
     );
 }
 
-template void run_ccn_warp_shuffle_n_to_m_work_distribution<triangle_distribution, int, int>(
+template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<triangle_distribution, int, int>(
     const int* __restrict__ left,
     const int* __restrict__ right,
     int* __restrict__ out,
@@ -641,7 +641,7 @@ template void run_ccn_warp_shuffle_n_to_m_work_distribution<triangle_distributio
     dsize_t max_rows_per_thread
 );
 
-template void run_ccn_warp_shuffle_n_to_m_work_distribution<triangle_distribution, float, float>(
+template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<triangle_distribution, float, float>(
     const float* __restrict__ left,
     const float* __restrict__ right,
     float* __restrict__ out,
@@ -655,7 +655,7 @@ template void run_ccn_warp_shuffle_n_to_m_work_distribution<triangle_distributio
     dsize_t max_rows_per_thread
 );
 
-template void run_ccn_warp_shuffle_n_to_m_work_distribution<triangle_distribution, double, double>(
+template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<triangle_distribution, double, double>(
     const double* __restrict__ left,
     const double* __restrict__ right,
     double* __restrict__ out,
@@ -669,7 +669,7 @@ template void run_ccn_warp_shuffle_n_to_m_work_distribution<triangle_distributio
     dsize_t max_rows_per_thread
 );
 
-template void run_ccn_warp_shuffle_n_to_m_work_distribution<rectangle_distribution, int, int>(
+template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<rectangle_distribution, int, int>(
     const int* __restrict__ left,
     const int* __restrict__ right,
     int* __restrict__ out,
@@ -683,7 +683,7 @@ template void run_ccn_warp_shuffle_n_to_m_work_distribution<rectangle_distributi
     dsize_t max_rows_per_thread
 );
 
-template void run_ccn_warp_shuffle_n_to_m_work_distribution<rectangle_distribution, float, float>(
+template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<rectangle_distribution, float, float>(
     const float* __restrict__ left,
     const float* __restrict__ right,
     float* __restrict__ out,
@@ -697,7 +697,7 @@ template void run_ccn_warp_shuffle_n_to_m_work_distribution<rectangle_distributi
     dsize_t max_rows_per_thread
 );
 
-template void run_ccn_warp_shuffle_n_to_m_work_distribution<rectangle_distribution, double, double>(
+template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<rectangle_distribution, double, double>(
     const double* __restrict__ left,
     const double* __restrict__ right,
     double* __restrict__ out,
@@ -711,7 +711,7 @@ template void run_ccn_warp_shuffle_n_to_m_work_distribution<rectangle_distributi
     dsize_t max_rows_per_thread
 );
 
-template void run_ccn_warp_shuffle_n_to_m_work_distribution<no_distribution, int, int>(
+template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<no_distribution, int, int>(
     const int* __restrict__ left,
     const int* __restrict__ right,
     int* __restrict__ out,
@@ -725,7 +725,7 @@ template void run_ccn_warp_shuffle_n_to_m_work_distribution<no_distribution, int
     dsize_t max_rows_per_thread
 );
 
-template void run_ccn_warp_shuffle_n_to_m_work_distribution<no_distribution, float, float>(
+template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<no_distribution, float, float>(
     const float* __restrict__ left,
     const float* __restrict__ right,
     float* __restrict__ out,
@@ -739,7 +739,7 @@ template void run_ccn_warp_shuffle_n_to_m_work_distribution<no_distribution, flo
     dsize_t max_rows_per_thread
 );
 
-template void run_ccn_warp_shuffle_n_to_m_work_distribution<no_distribution, double, double>(
+template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<no_distribution, double, double>(
     const double* __restrict__ left,
     const double* __restrict__ right,
     double* __restrict__ out,

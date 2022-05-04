@@ -22,8 +22,8 @@ namespace cross {
 
 namespace {
 
-constexpr dsize_t right_rows_limit = SHUFFLE_MULTIROW_MULTIRIGHT_RIGHT_ROWS_LIMIT;
-constexpr dsize_t right_mats_limit = SHUFFLE_MULTIROW_MULTIRIGHT_RIGHT_MATS_LIMIT;
+constexpr dsize_t right_rows_limit = SHUFFLE_MULTIROW_RIGHT_MULTIMAT_RIGHT_RIGHT_ROWS_LIMIT;
+constexpr dsize_t right_mats_limit = SHUFFLE_MULTIROW_RIGHT_MULTIMAT_RIGHT_RIGHT_MATS_LIMIT;
 
 /**
  * Arguments for the warp_shuffle_impl function.
@@ -281,7 +281,7 @@ __device__ void wind_down(
 }
 
 template<dsize_t NUM_RIGHT_ROWS, dsize_t NUM_RIGHT_MATS, bool ATOMIC, dsize_t WARP_SIZE, typename T, typename RES>
-__device__ void multirow_multiright_shuffle_impl(
+__device__ void shuffle_multirow_right_multimat_right_impl(
     const cg::thread_block& ctb,
     const cg::thread_block_tile<WARP_SIZE>& warp,
     warp_shuffle_impl_args<T, RES> args,
@@ -332,7 +332,7 @@ __device__ void multirow_multiright_shuffle_impl(
 }
 
 template<dsize_t NUM_RIGHT_ROWS, dsize_t NUM_RIGHT_MATS, bool ATOMIC, dsize_t WARP_SIZE, typename T, typename RES>
-__device__ void multirow_multiright_shuffle_impl_mats_dispatch(
+__device__ void shuffle_multirow_right_multimat_right_impl_mats_dispatch(
     const cg::thread_block& ctb,
     const cg::thread_block_tile<WARP_SIZE>& warp,
     dsize_t num_right_mats,
@@ -349,14 +349,14 @@ __device__ void multirow_multiright_shuffle_impl_mats_dispatch(
         assert(false);
     } else {
         if (NUM_RIGHT_MATS == num_right_mats) {
-            multirow_multiright_shuffle_impl<NUM_RIGHT_ROWS, NUM_RIGHT_MATS, ATOMIC>(
+            shuffle_multirow_right_multimat_right_impl<NUM_RIGHT_ROWS, NUM_RIGHT_MATS, ATOMIC>(
                 ctb,
                 warp,
                 args,
                 res
             );
         } else {
-            multirow_multiright_shuffle_impl_mats_dispatch<NUM_RIGHT_ROWS, NUM_RIGHT_MATS - 1, ATOMIC>(
+            shuffle_multirow_right_multimat_right_impl_mats_dispatch<NUM_RIGHT_ROWS, NUM_RIGHT_MATS - 1, ATOMIC>(
                 ctb,
                 warp,
                 num_right_mats,
@@ -368,7 +368,7 @@ __device__ void multirow_multiright_shuffle_impl_mats_dispatch(
 }
 
 template<dsize_t NUM_RIGHT_ROWS, dsize_t NUM_RIGHT_MATS, bool ATOMIC, dsize_t WARP_SIZE, typename T, typename RES>
-__device__ void multirow_multiright_shuffle_impl_rows_dispatch(
+__device__ void shuffle_multirow_right_multimat_right_impl_rows_dispatch(
     const cg::thread_block& ctb,
     const cg::thread_block_tile<WARP_SIZE>& warp,
     dsize_t num_right_rows,
@@ -388,7 +388,7 @@ __device__ void multirow_multiright_shuffle_impl_rows_dispatch(
         (void)res;
     } else {
         if (NUM_RIGHT_ROWS == num_right_rows) {
-            multirow_multiright_shuffle_impl_mats_dispatch<NUM_RIGHT_ROWS, NUM_RIGHT_MATS, ATOMIC>(
+            shuffle_multirow_right_multimat_right_impl_mats_dispatch<NUM_RIGHT_ROWS, NUM_RIGHT_MATS, ATOMIC>(
                 ctb,
                 warp,
                 num_right_mats,
@@ -396,7 +396,7 @@ __device__ void multirow_multiright_shuffle_impl_rows_dispatch(
                 res
             );
         } else {
-            multirow_multiright_shuffle_impl_rows_dispatch<NUM_RIGHT_ROWS - 1, NUM_RIGHT_MATS, ATOMIC>(
+            shuffle_multirow_right_multimat_right_impl_rows_dispatch<NUM_RIGHT_ROWS - 1, NUM_RIGHT_MATS, ATOMIC>(
                 ctb,
                 warp,
                 num_right_rows,
@@ -410,7 +410,7 @@ __device__ void multirow_multiright_shuffle_impl_rows_dispatch(
 
 
 template<dsize_t MAX_RIGHT_ROWS_PER_THREAD, dsize_t MAX_RIGHT_MATRICES_PER_THREAD, typename T, typename RES>
-__global__ void ccn_multirow_multiright_shuffle(
+__global__ void ccn_shuffle_multirow_right_multimat_right(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -508,7 +508,7 @@ __global__ void ccn_multirow_multiright_shuffle(
         search_size
     );
 
-    multirow_multiright_shuffle_impl_rows_dispatch<MAX_RIGHT_ROWS_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD, false>(
+    shuffle_multirow_right_multimat_right_impl_rows_dispatch<MAX_RIGHT_ROWS_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD, false>(
         ctb,
         warp,
         warp_num_right_rows,
@@ -519,7 +519,7 @@ __global__ void ccn_multirow_multiright_shuffle(
 }
 
 template<dsize_t MAX_RIGHT_ROWS_PER_THREAD, dsize_t MAX_RIGHT_MATRICES_PER_THREAD, typename T, typename RES>
-__host__ void ccn_multirow_multiright_shuffle_mat_disptach(
+__host__ void ccn_shuffle_multirow_right_multimat_right_mat_disptach(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -545,7 +545,7 @@ __host__ void ccn_multirow_multiright_shuffle_mat_disptach(
 
             dsize_t shared_mem_size = block_size * MAX_RIGHT_ROWS_PER_THREAD * MAX_RIGHT_MATRICES_PER_THREAD * sizeof(RES);
 
-            ccn_multirow_multiright_shuffle<MAX_RIGHT_ROWS_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD><<<num_blocks, num_threads, shared_mem_size>>>(
+            ccn_shuffle_multirow_right_multimat_right<MAX_RIGHT_ROWS_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD><<<num_blocks, num_threads, shared_mem_size>>>(
                 left,
                 right,
                 out,
@@ -554,7 +554,7 @@ __host__ void ccn_multirow_multiright_shuffle_mat_disptach(
                 num_right_matrices
             );
         } else {
-            ccn_multirow_multiright_shuffle_mat_disptach<MAX_RIGHT_ROWS_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD - 1>(
+            ccn_shuffle_multirow_right_multimat_right_mat_disptach<MAX_RIGHT_ROWS_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD - 1>(
                 left,
                 right,
                 out,
@@ -582,7 +582,7 @@ __host__ void ccn_multirow_multiright_shuffle_mat_disptach(
 }
 
 template<dsize_t MAX_RIGHT_ROWS_PER_THREAD, dsize_t MAX_RIGHT_MATRICES_PER_THREAD, typename T, typename RES>
-__host__ void ccn_multirow_multiright_shuffle_rows_disptach(
+__host__ void ccn_shuffle_multirow_right_multimat_right_rows_disptach(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -595,7 +595,7 @@ __host__ void ccn_multirow_multiright_shuffle_rows_disptach(
 ) {
     if constexpr(MAX_RIGHT_ROWS_PER_THREAD > 0) {
         if (MAX_RIGHT_ROWS_PER_THREAD == right_rows_per_thread) {
-            ccn_multirow_multiright_shuffle_mat_disptach<MAX_RIGHT_ROWS_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD>(
+            ccn_shuffle_multirow_right_multimat_right_mat_disptach<MAX_RIGHT_ROWS_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD>(
                 left,
                 right,
                 out,
@@ -606,7 +606,7 @@ __host__ void ccn_multirow_multiright_shuffle_rows_disptach(
                 right_matrices_per_thread
             );
         } else {
-            ccn_multirow_multiright_shuffle_rows_disptach<MAX_RIGHT_ROWS_PER_THREAD - 1, MAX_RIGHT_MATRICES_PER_THREAD>(
+            ccn_shuffle_multirow_right_multimat_right_rows_disptach<MAX_RIGHT_ROWS_PER_THREAD - 1, MAX_RIGHT_MATRICES_PER_THREAD>(
                 left,
                 right,
                 out,
@@ -638,7 +638,7 @@ __host__ void ccn_multirow_multiright_shuffle_rows_disptach(
 } // END anonymous namespace
 
 template<typename T, typename RES>
-void run_ccn_multirow_multiright_shuffle(
+void run_ccn_shuffle_multirow_right_multimat_right(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -671,7 +671,7 @@ void run_ccn_multirow_multiright_shuffle(
         );
     }
 
-    ccn_multirow_multiright_shuffle_rows_disptach<right_rows_limit, right_mats_limit>(
+    ccn_shuffle_multirow_right_multimat_right_rows_disptach<right_rows_limit, right_mats_limit>(
         left,
         right,
         out,
@@ -684,7 +684,7 @@ void run_ccn_multirow_multiright_shuffle(
     );
 }
 
-template void run_ccn_multirow_multiright_shuffle<int, int>(
+template void run_ccn_shuffle_multirow_right_multimat_right<int, int>(
     const int* __restrict__ left,
     const int* __restrict__ right,
     int* __restrict__ out,
@@ -696,7 +696,7 @@ template void run_ccn_multirow_multiright_shuffle<int, int>(
     dsize_t right_matrices_per_thread
 );
 
-template void run_ccn_multirow_multiright_shuffle<float, float>(
+template void run_ccn_shuffle_multirow_right_multimat_right<float, float>(
     const float* __restrict__ left,
     const float* __restrict__ right,
     float* __restrict__ out,
@@ -708,7 +708,7 @@ template void run_ccn_multirow_multiright_shuffle<float, float>(
     dsize_t right_matrices_per_thread
 );
 
-template void run_ccn_multirow_multiright_shuffle<double, double>(
+template void run_ccn_shuffle_multirow_right_multimat_right<double, double>(
     const double* __restrict__ left,
     const double* __restrict__ right,
     double* __restrict__ out,

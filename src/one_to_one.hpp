@@ -402,9 +402,9 @@ std::vector<std::string> naive_warp_shuffle_work_distribution_one_to_one<T, BENC
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class naive_shift_per_warp_one_to_one: public one_to_one<T, BENCH_TYPE, ALLOC> {
+class naive_warp_per_shift_one_to_one: public one_to_one<T, BENCH_TYPE, ALLOC> {
 public:
-    explicit naive_shift_per_warp_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
+    explicit naive_warp_per_shift_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_one<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), target_(), result_()
     {
         shifts_per_block_ = args.value("shifts_per_block", 8);
@@ -451,7 +451,7 @@ protected:
 
     void run_impl() override {
         CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
-                     run_ccn_shift_per_warp(
+                     run_ccn_warp_per_shift(
                          d_ref_,
                          d_target_,
                          d_result_,
@@ -493,14 +493,14 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
-std::vector<std::string> naive_shift_per_warp_one_to_one<T, BENCH_TYPE, ALLOC>::labels{
+std::vector<std::string> naive_warp_per_shift_one_to_one<T, BENCH_TYPE, ALLOC>::labels{
     "Kernel"
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class naive_shift_per_warp_work_distribution_one_to_one: public one_to_one<T, BENCH_TYPE, ALLOC> {
+class naive_warp_per_shift_work_distribution_one_to_one: public one_to_one<T, BENCH_TYPE, ALLOC> {
 public:
-    explicit naive_shift_per_warp_work_distribution_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
+    explicit naive_warp_per_shift_work_distribution_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_one<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), target_(), result_()
     {
         shifts_per_block_ = args.value("shifts_per_block", 8);
@@ -599,7 +599,7 @@ private:
             // Need to zero out as work distribution uses atomicAdd on the results matrix
             cuda_memset(d_result_, 0, result_.size());
 
-            run_ccn_shift_per_warp_work_distribution<DISTRIBUTION>(
+            run_ccn_warp_per_shift_work_distribution<DISTRIBUTION>(
                 d_ref_,
                 d_target_,
                 d_result_,
@@ -613,15 +613,15 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
-std::vector<std::string> naive_shift_per_warp_work_distribution_one_to_one<T, BENCH_TYPE, ALLOC>::labels{
+std::vector<std::string> naive_warp_per_shift_work_distribution_one_to_one<T, BENCH_TYPE, ALLOC>::labels{
     "Kernel"
 };
 
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class naive_shift_per_warp_simple_indexing_one_to_one: public one_to_one<T, BENCH_TYPE, ALLOC> {
+class naive_warp_per_shift_simple_indexing_one_to_one: public one_to_one<T, BENCH_TYPE, ALLOC> {
 public:
-    explicit naive_shift_per_warp_simple_indexing_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
+    explicit naive_warp_per_shift_simple_indexing_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_one<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), target_(), result_()
     {
         shifts_per_block_ = args.value("shifts_per_block", 8);
@@ -668,7 +668,7 @@ protected:
 
     void run_impl() override {
         CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
-                     run_ccn_shift_per_warp_simple_indexing(
+                     run_ccn_warp_per_shift_simple_indexing(
                          d_ref_,
                          d_target_,
                          d_result_,
@@ -710,15 +710,15 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
-std::vector<std::string> naive_shift_per_warp_simple_indexing_one_to_one<T, BENCH_TYPE, ALLOC>::labels{
+std::vector<std::string> naive_warp_per_shift_simple_indexing_one_to_one<T, BENCH_TYPE, ALLOC>::labels{
     "Kernel"
 };
 
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class naive_shift_per_warp_shared_mem_one_to_one: public one_to_one<T, BENCH_TYPE, ALLOC> {
+class naive_warp_per_shift_shared_mem_one_to_one: public one_to_one<T, BENCH_TYPE, ALLOC> {
 public:
-    explicit naive_shift_per_warp_shared_mem_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
+    explicit naive_warp_per_shift_shared_mem_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_one<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), target_(), result_()
     {
         // These arguments DO NOT WORK with DEBUG build, as unoptimized kernel requires too many registers
@@ -791,7 +791,7 @@ protected:
 
     void run_impl() override {
         CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
-                     run_ccn_shift_per_warp_shared_mem(
+                     run_ccn_warp_per_shift_shared_mem(
                          d_ref_,
                          d_target_,
                          d_result_,
@@ -849,7 +849,7 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
-std::vector<std::string> naive_shift_per_warp_shared_mem_one_to_one<T, BENCH_TYPE, ALLOC>::labels{
+std::vector<std::string> naive_warp_per_shift_shared_mem_one_to_one<T, BENCH_TYPE, ALLOC>::labels{
     "Kernel"
 };
 
@@ -950,9 +950,9 @@ std::vector<std::string> naive_shift_per_block_one_to_one<T, BENCH_TYPE, ALLOC>:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class naive_multirow_shuffle_one_to_one: public one_to_one<T, BENCH_TYPE, ALLOC> {
+class naive_shuffle_multirow_right_one_to_one: public one_to_one<T, BENCH_TYPE, ALLOC> {
 public:
-    explicit naive_multirow_shuffle_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
+    explicit naive_shuffle_multirow_right_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_one<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), target_(), result_()
     {
         block_y_size_ = args.value("block_y_size", 8);
@@ -1001,7 +1001,7 @@ protected:
 
     void run_impl() override {
         CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
-                              run_ccn_multirow_shuffle(
+                              run_ccn_shuffle_multirow_right(
                                   d_ref_,
                                   d_target_,
                                   d_result_,
@@ -1045,14 +1045,14 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
-std::vector<std::string> naive_multirow_shuffle_one_to_one<T, BENCH_TYPE, ALLOC>::labels{
+std::vector<std::string> naive_shuffle_multirow_right_one_to_one<T, BENCH_TYPE, ALLOC>::labels{
     "Kernel"
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class naive_multileft_shuffle_one_to_one: public one_to_one<T, BENCH_TYPE, ALLOC> {
+class naive_shuffle_multirow_both_one_to_one: public one_to_one<T, BENCH_TYPE, ALLOC> {
 public:
-    explicit naive_multileft_shuffle_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
+    explicit naive_shuffle_multirow_both_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_one<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), target_(), result_()
     {
         block_y_size_ = args.value("block_y_size", 8);
@@ -1104,7 +1104,7 @@ protected:
 
     void run_impl() override {
         CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
-                              run_ccn_multileft_shuffle(
+                              run_ccn_shuffle_multirow_both(
                                   d_ref_,
                                   d_target_,
                                   d_result_,
@@ -1150,14 +1150,14 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
-std::vector<std::string> naive_multileft_shuffle_one_to_one<T, BENCH_TYPE, ALLOC>::labels{
+std::vector<std::string> naive_shuffle_multirow_both_one_to_one<T, BENCH_TYPE, ALLOC>::labels{
     "Kernel"
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class naive_multileft_shuffle_one_to_one_orig: public one_to_one<T, BENCH_TYPE, ALLOC> {
+class naive_shuffle_multirow_both_one_to_one_orig: public one_to_one<T, BENCH_TYPE, ALLOC> {
 public:
-    explicit naive_multileft_shuffle_one_to_one_orig(const json& args, std::chrono::nanoseconds min_measured_time)
+    explicit naive_shuffle_multirow_both_one_to_one_orig(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_one<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), target_(), result_()
     {
         block_y_size_ = args.value("block_y_size", 8);
@@ -1210,7 +1210,7 @@ protected:
 
     void run_impl() override {
         CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
-                              orig::run_ccn_multileft_shuffle(
+                              orig::run_ccn_shuffle_multirow_both(
                                   d_ref_,
                                   d_target_,
                                   d_result_,
@@ -1256,15 +1256,15 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
-std::vector<std::string> naive_multileft_shuffle_one_to_one_orig<T, BENCH_TYPE, ALLOC>::labels{
+std::vector<std::string> naive_shuffle_multirow_both_one_to_one_orig<T, BENCH_TYPE, ALLOC>::labels{
     "Kernel"
 };
 
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class naive_multirow_multiright_shuffle_one_to_one: public one_to_one<T, BENCH_TYPE, ALLOC> {
+class naive_shuffle_multirow_right_multimat_right_one_to_one: public one_to_one<T, BENCH_TYPE, ALLOC> {
 public:
-    explicit naive_multirow_multiright_shuffle_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
+    explicit naive_shuffle_multirow_right_multimat_right_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_one<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), target_(), result_()
     {
         block_y_size_ = args.value("block_y_size", 8);
@@ -1313,7 +1313,7 @@ protected:
 
     void run_impl() override {
         CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
-                              run_ccn_multirow_multiright_shuffle(
+                              run_ccn_shuffle_multirow_right_multimat_right(
                                   d_ref_,
                                   d_target_,
                                   d_result_,
@@ -1359,7 +1359,7 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
-std::vector<std::string> naive_multirow_multiright_shuffle_one_to_one<T, BENCH_TYPE, ALLOC>::labels{
+std::vector<std::string> naive_shuffle_multirow_right_multimat_right_one_to_one<T, BENCH_TYPE, ALLOC>::labels{
     "Kernel"
 };
 

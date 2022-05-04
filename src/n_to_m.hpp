@@ -317,9 +317,9 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class naive_shuffle_specialized_n_to_m: public n_to_m<T, BENCH_TYPE, ALLOC> {
+class naive_shuffle_multimat_both_work_distribution_n_to_m: public n_to_m<T, BENCH_TYPE, ALLOC> {
 public:
-    explicit naive_shuffle_specialized_n_to_m(const json& args, std::chrono::nanoseconds min_measured_time)
+    explicit naive_shuffle_multimat_both_work_distribution_n_to_m(const json& args, std::chrono::nanoseconds min_measured_time)
         :n_to_m<T, BENCH_TYPE, ALLOC>(false, 0, min_measured_time), refs_(), targets_(), results_()
     {
         block_y_size_ = args.value("block_y_size", 8);
@@ -425,7 +425,7 @@ private:
     template<typename DISTRIBUTION>
     void start_kernel() {
         CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
-            run_ccn_warp_shuffle_n_to_m_work_distribution<DISTRIBUTION>(
+            run_ccn_shuffle_n_to_m_multimat_both_work_distribution<DISTRIBUTION>(
                 d_refs_,
                 d_targets_,
                 d_results_,
@@ -443,14 +443,14 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
-std::vector<std::string> naive_shuffle_specialized_n_to_m<T, BENCH_TYPE, ALLOC>::labels{
+std::vector<std::string> naive_shuffle_multimat_both_work_distribution_n_to_m<T, BENCH_TYPE, ALLOC>::labels{
     "Kernel"
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class naive_shuffle_specialized_n_to_m_orig: public n_to_m<T, BENCH_TYPE, ALLOC> {
+class naive_shuffle_multimat_both_work_distribution_n_to_m_orig: public n_to_m<T, BENCH_TYPE, ALLOC> {
 public:
-    explicit naive_shuffle_specialized_n_to_m_orig(const json& args, std::chrono::nanoseconds min_measured_time)
+    explicit naive_shuffle_multimat_both_work_distribution_n_to_m_orig(const json& args, std::chrono::nanoseconds min_measured_time)
         :n_to_m<T, BENCH_TYPE, ALLOC>(false, 0, min_measured_time), refs_(), targets_(), results_()
     {
         block_y_size_ = args.value("block_y_size", 8);
@@ -556,7 +556,7 @@ private:
     template<typename DISTRIBUTION>
     void start_kernel() {
         CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
-            orig::run_ccn_warp_shuffle_n_to_m_work_distribution<DISTRIBUTION>(
+            orig::run_ccn_shuffle_n_to_m_multimat_both_work_distribution<DISTRIBUTION>(
                 d_refs_,
                 d_targets_,
                 d_results_,
@@ -574,14 +574,14 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
-std::vector<std::string> naive_shuffle_specialized_n_to_m_orig<T, BENCH_TYPE, ALLOC>::labels{
+std::vector<std::string> naive_shuffle_multimat_both_work_distribution_n_to_m_orig<T, BENCH_TYPE, ALLOC>::labels{
     "Kernel"
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class naive_shuffle_specialized_n_to_m_multirow: public n_to_m<T, BENCH_TYPE, ALLOC> {
+class naive_shuffle_multirow_both_multimat_both_n_to_m: public n_to_m<T, BENCH_TYPE, ALLOC> {
 public:
-    explicit naive_shuffle_specialized_n_to_m_multirow(const json& args, std::chrono::nanoseconds min_measured_time)
+    explicit naive_shuffle_multirow_both_multimat_both_n_to_m(const json& args, std::chrono::nanoseconds min_measured_time)
         :n_to_m<T, BENCH_TYPE, ALLOC>(false, 0, min_measured_time), refs_(), targets_(), results_()
     {
         warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
@@ -636,7 +636,7 @@ protected:
 
     void run_impl() override {
         CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
-            run_ccn_n_to_m_shuffle_multirow(
+            run_ccn_n_to_m_shuffle_multirow_both_multimat_both(
                 d_refs_,
                 d_targets_,
                 d_results_,
@@ -688,7 +688,7 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
-std::vector<std::string> naive_shuffle_specialized_n_to_m_multirow<T, BENCH_TYPE, ALLOC>::labels{
+std::vector<std::string> naive_shuffle_multirow_both_multimat_both_n_to_m<T, BENCH_TYPE, ALLOC>::labels{
     "Kernel"
 };
 

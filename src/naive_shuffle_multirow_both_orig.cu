@@ -22,8 +22,8 @@ namespace cross::orig {
 
 namespace {
 
-constexpr dsize_t shifts_per_thread_limit = SHUFFLE_MULTILEFT_ORIG_SHIFTS_PER_THREAD_LIMIT;
-constexpr dsize_t left_rows_limit = SHUFFLE_MULTILEFT_ORIG_LEFT_ROWS_LIMIT;
+constexpr dsize_t shifts_per_thread_limit = SHUFFLE_MULTIROW_BOTH_ORIG_SHIFTS_PER_THREAD_LIMIT;
+constexpr dsize_t left_rows_limit = SHUFFLE_MULTIROW_BOTH_ORIG_LEFT_ROWS_LIMIT;
 
 /**
  * Arguments for the warp_shuffle_impl function.
@@ -306,7 +306,7 @@ __device__ void wind_down(
 }
 
 template<dsize_t SHIFTS_PER_THREAD, dsize_t MAX_LEFT_ROWS, bool ATOMIC, dsize_t WARP_SIZE, typename T, typename RES>
-__device__ void multileft_shuffle_impl(
+__device__ void shuffle_multirow_both_impl(
     const cg::thread_block& ctb,
     const cg::thread_block_tile<WARP_SIZE>& warp,
     warp_shuffle_impl_args<T, RES> args,
@@ -373,7 +373,7 @@ __device__ void multileft_shuffle_impl(
 }
 
 template<dsize_t SHIFTS_PER_THREAD, dsize_t MAX_LEFT_ROWS, bool ATOMIC, dsize_t WARP_SIZE, typename T, typename RES>
-__device__ void multileft_shuffle_impl_dispatch(
+__device__ void shuffle_multirow_both_impl_dispatch(
     const cg::thread_block& ctb,
     const cg::thread_block_tile<WARP_SIZE>& warp,
     dsize_t num_thread_shifts,
@@ -391,14 +391,14 @@ __device__ void multileft_shuffle_impl_dispatch(
         (void) res;
     } else {
         if (SHIFTS_PER_THREAD == num_thread_shifts) {
-            multileft_shuffle_impl<SHIFTS_PER_THREAD, MAX_LEFT_ROWS, ATOMIC>(
+            shuffle_multirow_both_impl<SHIFTS_PER_THREAD, MAX_LEFT_ROWS, ATOMIC>(
                 ctb,
                 warp,
                 args,
                 res
             );
         } else {
-            multileft_shuffle_impl_dispatch<SHIFTS_PER_THREAD - 1, MAX_LEFT_ROWS, ATOMIC>(
+            shuffle_multirow_both_impl_dispatch<SHIFTS_PER_THREAD - 1, MAX_LEFT_ROWS, ATOMIC>(
                 ctb,
                 warp,
                 num_thread_shifts,
@@ -416,7 +416,7 @@ __device__ void multileft_shuffle_impl_dispatch(
  * and then always loads 32 values
  */
 template<dsize_t MAX_SHIFTS_PER_THREAD, dsize_t MAX_LEFT_ROWS, typename T, typename RES>
-__global__ void ccn_multileft_shuffle(
+__global__ void ccn_shuffle_multirow_both(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -523,7 +523,7 @@ __global__ void ccn_multileft_shuffle(
         search_size
     );
 
-    multileft_shuffle_impl_dispatch<MAX_SHIFTS_PER_THREAD, MAX_LEFT_ROWS, false>(
+    shuffle_multirow_both_impl_dispatch<MAX_SHIFTS_PER_THREAD, MAX_LEFT_ROWS, false>(
         ctb,
         warp,
         num_thread_shifts,
@@ -533,7 +533,7 @@ __global__ void ccn_multileft_shuffle(
 }
 
 template<dsize_t MAX_SHIFTS_PER_THREAD, dsize_t MAX_LEFT_ROWS, typename T, typename RES>
-__host__ void ccn_multileft_shuffle_left_rows_dispatch(
+__host__ void ccn_shuffle_multirow_both_left_rows_dispatch(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -553,7 +553,7 @@ __host__ void ccn_multileft_shuffle_left_rows_dispatch(
             dsize_t block_size = num_threads.x * num_threads.y;
             dsize_t shared_mem_size = block_size * MAX_SHIFTS_PER_THREAD * sizeof(RES);
 
-            ccn_multileft_shuffle<MAX_SHIFTS_PER_THREAD, MAX_LEFT_ROWS><<<num_blocks, num_threads, shared_mem_size>>>(
+            ccn_shuffle_multirow_both<MAX_SHIFTS_PER_THREAD, MAX_LEFT_ROWS><<<num_blocks, num_threads, shared_mem_size>>>(
                 left,
                 right,
                 out,
@@ -561,7 +561,7 @@ __host__ void ccn_multileft_shuffle_left_rows_dispatch(
                 search_size
             );
         } else {
-            ccn_multileft_shuffle_left_rows_dispatch<MAX_SHIFTS_PER_THREAD, MAX_LEFT_ROWS - 1>(
+            ccn_shuffle_multirow_both_left_rows_dispatch<MAX_SHIFTS_PER_THREAD, MAX_LEFT_ROWS - 1>(
                 left,
                 right,
                 out,
@@ -587,7 +587,7 @@ __host__ void ccn_multileft_shuffle_left_rows_dispatch(
 }
 
 template<dsize_t MAX_SHIFTS_PER_THREAD, dsize_t MAX_LEFT_ROWS, typename T, typename RES>
-__host__ void ccn_multileft_shuffle_shifts_dispatch(
+__host__ void ccn_shuffle_multirow_both_shifts_dispatch(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -599,7 +599,7 @@ __host__ void ccn_multileft_shuffle_shifts_dispatch(
 ) {
     if constexpr(MAX_SHIFTS_PER_THREAD > 0) {
         if (MAX_SHIFTS_PER_THREAD == max_shifts_per_thread) {
-            ccn_multileft_shuffle_left_rows_dispatch<MAX_SHIFTS_PER_THREAD, MAX_LEFT_ROWS>(
+            ccn_shuffle_multirow_both_left_rows_dispatch<MAX_SHIFTS_PER_THREAD, MAX_LEFT_ROWS>(
                 left,
                 right,
                 out,
@@ -609,7 +609,7 @@ __host__ void ccn_multileft_shuffle_shifts_dispatch(
                 max_left_rows
             );
         } else {
-            ccn_multileft_shuffle_shifts_dispatch<MAX_SHIFTS_PER_THREAD - 1, MAX_LEFT_ROWS>(
+            ccn_shuffle_multirow_both_shifts_dispatch<MAX_SHIFTS_PER_THREAD - 1, MAX_LEFT_ROWS>(
                 left,
                 right,
                 out,
@@ -639,7 +639,7 @@ __host__ void ccn_multileft_shuffle_shifts_dispatch(
 } // END anonymous namespace
 
 template<typename T, typename RES>
-void run_ccn_multileft_shuffle(
+void run_ccn_shuffle_multirow_both(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -671,7 +671,7 @@ void run_ccn_multileft_shuffle(
         );
     }
 
-    ccn_multileft_shuffle_shifts_dispatch<shifts_per_thread_limit, left_rows_limit>(
+    ccn_shuffle_multirow_both_shifts_dispatch<shifts_per_thread_limit, left_rows_limit>(
         left,
         right,
         out,
@@ -683,7 +683,7 @@ void run_ccn_multileft_shuffle(
     );
 }
 
-template void run_ccn_multileft_shuffle<int, int>(
+template void run_ccn_shuffle_multirow_both<int, int>(
         const int* __restrict__ left,
         const int* __restrict__ right,
         int* __restrict__ out,
@@ -694,7 +694,7 @@ template void run_ccn_multileft_shuffle<int, int>(
         dsize_t max_left_rows
 );
 
-template void run_ccn_multileft_shuffle<float, float>(
+template void run_ccn_shuffle_multirow_both<float, float>(
         const float* __restrict__ left,
         const float* __restrict__ right,
         float* __restrict__ out,
@@ -705,7 +705,7 @@ template void run_ccn_multileft_shuffle<float, float>(
         dsize_t max_left_rows
 );
 
-template void run_ccn_multileft_shuffle<double, double>(
+template void run_ccn_shuffle_multirow_both<double, double>(
         const double* __restrict__ left,
         const double* __restrict__ right,
         double* __restrict__ out,

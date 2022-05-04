@@ -75,7 +75,7 @@ void run_ccn_warp_shuffle(
 );
 
 template<typename T, typename RES>
-void run_ccn_shift_per_warp(
+void run_ccn_warp_per_shift(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -85,7 +85,7 @@ void run_ccn_shift_per_warp(
 );
 
 template<typename T, typename RES>
-void run_ccn_shift_per_warp_simple_indexing(
+void run_ccn_warp_per_shift_simple_indexing(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -95,7 +95,7 @@ void run_ccn_shift_per_warp_simple_indexing(
 );
 
 template<typename DIST, typename T, typename RES>
-void run_ccn_shift_per_warp_work_distribution(
+void run_ccn_warp_per_shift_work_distribution(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -120,7 +120,7 @@ void run_ccn_warp_shuffle_work_distribution(
 );
 
 template<typename T, typename RES>
-void run_ccn_shift_per_warp_shared_mem(
+void run_ccn_warp_per_shift_shared_mem(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -136,7 +136,7 @@ void run_ccn_shift_per_warp_shared_mem(
 );
 
 template<typename DIST, typename T, typename RES>
-void run_ccn_warp_shuffle_n_to_m_work_distribution(
+void run_ccn_shuffle_n_to_m_multimat_both_work_distribution(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -151,7 +151,7 @@ void run_ccn_warp_shuffle_n_to_m_work_distribution(
 );
 
 template<typename T, typename RES>
-void run_ccn_multirow_shuffle(
+void run_ccn_shuffle_multirow_right(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -162,7 +162,7 @@ void run_ccn_multirow_shuffle(
 );
 
 template<typename T, typename RES>
-void run_ccn_multileft_shuffle(
+void run_ccn_shuffle_multirow_both(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -184,7 +184,7 @@ void run_ccn_shift_per_block(
 );
 
 template<typename T, typename RES>
-void run_ccn_multirow_multiright_shuffle(
+void run_ccn_shuffle_multirow_right_multimat_right(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -197,7 +197,7 @@ void run_ccn_multirow_multiright_shuffle(
 );
 
 template<typename T, typename RES>
-void run_ccn_n_to_mn_shuffle(
+void run_ccn_shuffle_one_to_many_multirow_both_multimat_right(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -211,7 +211,7 @@ void run_ccn_n_to_mn_shuffle(
 );
 
 template<typename T, typename RES>
-void run_ccn_n_to_m_shuffle_multirow(
+void run_ccn_n_to_m_shuffle_multirow_both_multimat_both(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -229,7 +229,7 @@ void run_ccn_n_to_m_shuffle_multirow(
 namespace orig {
 
 template<typename DIST, typename T, typename RES>
-void run_ccn_warp_shuffle_n_to_m_work_distribution(
+void run_ccn_shuffle_n_to_m_multimat_both_work_distribution(
     const T *__restrict__ left,
     const T *__restrict__ right,
     RES *__restrict__ out,
@@ -244,7 +244,7 @@ void run_ccn_warp_shuffle_n_to_m_work_distribution(
 );
 
 template<typename T, typename RES>
-void run_ccn_multileft_shuffle(
+void run_ccn_shuffle_multirow_both(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
