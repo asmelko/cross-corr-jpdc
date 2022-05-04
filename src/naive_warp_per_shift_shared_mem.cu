@@ -21,7 +21,7 @@ namespace cross {
 
 namespace {
 
-constexpr dsize_t max_num_right_matrices = 8;
+constexpr dsize_t right_matrices_per_block_limit = WARP_PER_SHIFT_SHARED_MEM_RIGHT_MATRICES_PER_BLOCK_LIMIT;
 
 /**
  *
@@ -391,7 +391,7 @@ __device__ void shared_mem_rows_impl_dispatch(
  * @param search_size
  * @param shared_mem_buffer_size
  */
-template<bool STRIDED_LOAD, typename T, typename RES>
+template<dsize_t MAX_RIGHT_MATRICES_PER_BLOCK,bool STRIDED_LOAD, typename T, typename RES>
 __global__ void ccn_shift_per_warp_shared_mem(
     const T* __restrict__ left,
     const T* __restrict__ right,
@@ -400,8 +400,7 @@ __global__ void ccn_shift_per_warp_shared_mem(
     dsize2_t search_size,
     dsize_t num_right_matrices,
     dsize_t shared_mem_row_size,
-    dsize_t shared_mem_rows,
-    dsize_t right_matrices_per_block
+    dsize_t shared_mem_rows
 ) {
     cg::grid_group grid = cg::this_grid();
     cg::thread_block ctb = cg::this_thread_block();
@@ -422,9 +421,9 @@ __global__ void ccn_shift_per_warp_shared_mem(
     dsize_t output_x_offset = block_x_index % search_size.x;
 
     // Index of the first right matrix to be processed by the current warp
-    dsize_t matrix_group_start_idx = matrix_group_idx * right_matrices_per_block;
+    dsize_t matrix_group_start_idx = matrix_group_idx * MAX_RIGHT_MATRICES_PER_BLOCK;
 
-    dsize_t block_num_right_matrices = min(num_right_matrices - matrix_group_start_idx, right_matrices_per_block);
+    dsize_t block_num_right_matrices = min(num_right_matrices - matrix_group_start_idx, MAX_RIGHT_MATRICES_PER_BLOCK);
 
     // These shifts are from right matrix to left, i.e. if we have index into the right matrix
     //  we need to add this value to get corresponding index in left matrix.
@@ -483,19 +482,110 @@ __global__ void ccn_shift_per_warp_shared_mem(
     );
 
     if (grid.group_dim().z != 1) {
-        shared_mem_rows_impl_dispatch<max_num_right_matrices, STRIDED_LOAD, true>(
+        shared_mem_rows_impl_dispatch<MAX_RIGHT_MATRICES_PER_BLOCK, STRIDED_LOAD, true>(
             ctb,
             warp,
             block_num_right_matrices,
             args
         );
     } else {
-        shared_mem_rows_impl_dispatch<max_num_right_matrices, STRIDED_LOAD, false>(
+        shared_mem_rows_impl_dispatch<MAX_RIGHT_MATRICES_PER_BLOCK, STRIDED_LOAD, false>(
             ctb,
             warp,
             block_num_right_matrices,
             args
         );
+    }
+}
+
+template<dsize_t MAX_RIGHT_MATRICES_PER_BLOCK, typename T, typename RES>
+__host__ void ccn_shift_per_warp_shared_mem_right_mats_dispatch(
+    const T* __restrict__ left,
+    const T* __restrict__ right,
+    RES* __restrict__ out,
+    dsize2_t matrix_size,
+    dsize2_t search_size,
+    dsize_t num_right_matrices,
+    dsize_t shifts_per_cuda_block,
+    dsize_t shared_mem_row_size,
+    dsize_t shared_mem_rows,
+    dsize_t right_matrices_per_block,
+    bool strided_load,
+    bool column_group_per_block
+) {
+    if constexpr(MAX_RIGHT_MATRICES_PER_BLOCK > 0) {
+        if (MAX_RIGHT_MATRICES_PER_BLOCK == right_matrices_per_block) {
+            dsize_t num_matrix_groups = div_up(num_right_matrices, right_matrices_per_block);
+
+            dsize_t max_num_column_groups = div_up(matrix_size.x, shared_mem_row_size);
+
+            dim3 num_threads(warp_size, shifts_per_cuda_block);
+            dim3 num_blocks(
+                search_size.x * num_matrix_groups,
+                div_up(search_size.y, num_threads.y),
+                column_group_per_block ? max_num_column_groups : 1
+            );
+
+            dsize_t shared_mem_buffer_size = shared_mem_row_size * shared_mem_rows * sizeof(T);
+            // Two buffers for ring buffer of submatrices from left input
+            dsize_t shared_mem_size = (2 + right_matrices_per_block) * shared_mem_buffer_size;
+
+            if (strided_load) {
+                ccn_shift_per_warp_shared_mem<MAX_RIGHT_MATRICES_PER_BLOCK, true><<<num_blocks, num_threads, shared_mem_size>>>(
+                    left,
+                    right,
+                    out,
+                    matrix_size,
+                    search_size,
+                    num_right_matrices,
+                    shared_mem_row_size,
+                    shared_mem_rows
+                );
+            } else {
+                ccn_shift_per_warp_shared_mem<MAX_RIGHT_MATRICES_PER_BLOCK, false><<<num_blocks, num_threads, shared_mem_size>>>(
+                    left,
+                    right,
+                    out,
+                    matrix_size,
+                    search_size,
+                    num_right_matrices,
+                    shared_mem_row_size,
+                    shared_mem_rows
+                );
+            }
+        } else {
+            ccn_shift_per_warp_shared_mem_right_mats_dispatch<MAX_RIGHT_MATRICES_PER_BLOCK - 1>(
+                left,
+                right,
+                out,
+                matrix_size,
+                search_size,
+                num_right_matrices,
+                shifts_per_cuda_block,
+                shared_mem_row_size,
+                shared_mem_rows,
+                right_matrices_per_block,
+                strided_load,
+                column_group_per_block
+            );
+        }
+    } else {
+        // TODO: Solve the -Wunused-but-set-parameter warning
+        // Silence the confusing -Wunused-but-set-parameter warning
+        // as we are not setting the parameters anywhere
+        (void)left;
+        (void)right;
+        (void)out;
+        (void)matrix_size;
+        (void)search_size;
+        (void)shifts_per_cuda_block;
+        (void)num_right_matrices;
+        (void)shared_mem_row_size;
+        (void)shared_mem_rows;
+        (void)right_matrices_per_block;
+        (void)strided_load;
+        (void)column_group_per_block;
+        assert(false);
     }
 }
 
@@ -521,55 +611,29 @@ void run_ccn_shift_per_warp_shared_mem(
         throw std::runtime_error("Too many shifts per block: "s + std::to_string(shifts_per_cuda_block) + " (max 32)");
     }
 
-    if (right_matrices_per_block == 0 || right_matrices_per_block > max_num_right_matrices) {
+    if (right_matrices_per_block == 0 || right_matrices_per_block > right_matrices_per_block_limit) {
         throw std::runtime_error("Invalid number of right matrices per block: "s +
                                  std::to_string(right_matrices_per_block) +
                                  " [1-"s +
-                                 std::to_string(max_num_right_matrices) +
+                                 std::to_string(right_matrices_per_block_limit) +
                                  "]"s
         );
     }
 
-    dsize_t num_matrix_groups = div_up(num_right_matrices, right_matrices_per_block);
-
-    dsize_t max_num_column_groups = div_up(matrix_size.x, shared_mem_row_size);
-
-    dim3 num_threads(warp_size, shifts_per_cuda_block);
-    dim3 num_blocks(
-        search_size.x * num_matrix_groups,
-        div_up(search_size.y, num_threads.y),
-        column_group_per_block ? max_num_column_groups : 1
+    ccn_shift_per_warp_shared_mem_right_mats_dispatch<right_matrices_per_block_limit>(
+        left,
+        right,
+        out,
+        matrix_size,
+        search_size,
+        num_right_matrices,
+        shifts_per_cuda_block,
+        shared_mem_row_size,
+        shared_mem_rows,
+        right_matrices_per_block,
+        strided_load,
+        column_group_per_block
     );
-
-    dsize_t shared_mem_buffer_size = shared_mem_row_size * shared_mem_rows * sizeof(T);
-    // Two buffers for ring buffer of submatrices from left input
-    dsize_t shared_mem_size = (2 + right_matrices_per_block) * shared_mem_buffer_size;
-
-    if (strided_load) {
-        ccn_shift_per_warp_shared_mem<true><<<num_blocks, num_threads, shared_mem_size>>>(
-            left,
-            right,
-            out,
-            matrix_size,
-            search_size,
-            num_right_matrices,
-            shared_mem_row_size,
-            shared_mem_rows,
-            right_matrices_per_block
-        );
-    } else {
-        ccn_shift_per_warp_shared_mem<false><<<num_blocks, num_threads, shared_mem_size>>>(
-            left,
-            right,
-            out,
-            matrix_size,
-            search_size,
-            num_right_matrices,
-            shared_mem_row_size,
-            shared_mem_rows,
-            right_matrices_per_block
-        );
-    }
 }
 
 template void run_ccn_shift_per_warp_shared_mem<int, int>(

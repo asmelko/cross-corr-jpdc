@@ -47,7 +47,7 @@ void run_cross_corr_naive_original(
     dsize2_t search_size,
     dsize_t subregions_per_pic,
     dsize_t batch_size,
-    cudaStream_t cudaStream = nullptr
+    cudaStream_t cuda_stream = nullptr
 );
 
 template<typename T>
@@ -116,7 +116,7 @@ void run_ccn_warp_shuffle_work_distribution(
     dsize_t cuda_rows_per_block,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread,
-    cudaStream_t cudaStream = nullptr
+    cudaStream_t cuda_stream = nullptr
 );
 
 template<typename T, typename RES>
@@ -158,7 +158,7 @@ void run_ccn_multirow_shuffle(
     dsize2_t matrix_size,
     dsize2_t search_size,
     dsize_t cuda_rows_per_block,
-    dsize_t max_right_rows
+    dsize_t right_rows_per_thread
 );
 
 template<typename T, typename RES>
@@ -192,7 +192,7 @@ void run_ccn_multirow_multiright_shuffle(
     dsize2_t search_size,
     dsize_t num_right_matrices,
     dsize_t cuda_rows_per_block,
-    dsize_t max_right_rows,
+    dsize_t right_rows_per_thread,
     dsize_t right_matrices_per_thread
 );
 

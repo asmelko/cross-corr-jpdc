@@ -21,6 +21,8 @@ namespace cross {
 
 namespace {
 
+constexpr dsize_t right_matrices_per_thread_limit = SHUFFLE_RIGHT_MATRICES_PER_THREAD_LIMIT;
+
 __device__ void get_matrix_group(
     dsize_t output_size,
     dsize_t ctb_index,
@@ -202,22 +204,41 @@ __device__ void warp_shuffle_impl(
     }
 }
 
-constexpr dsize_t max_num_right_matrices = 8;
+template<dsize_t NUM_RIGHTS, bool ATOMIC, dsize_t WARP_SIZE, typename T, typename RES>
+__device__ void warp_shuffle_impl_right_mats_dispatch(
+    const cg::thread_block_tile<WARP_SIZE>& warp,
+    dsize_t num_right_matrices,
+    warp_shuffle_impl_args<T, RES> args
+) {
+    if constexpr(NUM_RIGHTS == 0) {
+        (void)warp;
+        (void)num_right_matrices;
+        (void)args;
+        assert(false);
+    } else {
+        if (NUM_RIGHTS == num_right_matrices) {
+            warp_shuffle_impl<NUM_RIGHTS, ATOMIC>(warp, args);
+        } else {
+            warp_shuffle_impl_right_mats_dispatch<NUM_RIGHTS - 1, ATOMIC>(
+                warp, num_right_matrices, args
+            );
+        }
+    }
+}
 
 /**
  * This kernel first computes the range which should be
  * computed by the current warp in the left and right matrices
  * and then always loads 32 values
  */
-template<typename T, typename RES>
+template<dsize_t MAX_RIGHT_MATRICES_PER_THREAD, typename T, typename RES>
 __global__ void ccn_warp_shuffle(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t num_right_matrices,
-    dsize_t right_matrices_per_thread
+    dsize_t num_right_matrices
 ) {
     // Initialize by loading a warp worth of data from left matrix
     // as we will be iterating over the left matrix
@@ -251,7 +272,7 @@ __global__ void ccn_warp_shuffle(
     get_matrix_group(
         search_size.x,
         ctb.group_index().x,
-        right_matrices_per_thread,
+        MAX_RIGHT_MATRICES_PER_THREAD,
         output_x_offset,
         matrix_group_start_idx
     );
@@ -306,7 +327,7 @@ __global__ void ccn_warp_shuffle(
     dsize_t warp_y_right_start = max(-warp_min_shift.y, 0);
     dsize_t warp_y_right_end = min(matrix_size.y - warp_max_shift.y, matrix_size.y);
 
-    dsize_t thread_num_right_matrices = min(num_right_matrices - matrix_group_start_idx, right_matrices_per_thread);
+    dsize_t thread_num_right_matrices = min(num_right_matrices - matrix_group_start_idx, MAX_RIGHT_MATRICES_PER_THREAD);
 
     auto args = create_warp_shuffle_impl_args(
         left,
@@ -320,33 +341,67 @@ __global__ void ccn_warp_shuffle(
         search_size
     );
 
-    switch (thread_num_right_matrices) {
-        case 1:
-            warp_shuffle_impl<1, false>(warp, args);
-            break;
-        case 2:
-            warp_shuffle_impl<2, false>(warp, args);
-            break;
-        case 3:
-            warp_shuffle_impl<3, false>(warp, args);
-            break;
-        case 4:
-            warp_shuffle_impl<4, false>(warp, args);
-            break;
-        case 5:
-            warp_shuffle_impl<5, false>(warp, args);
-            break;
-        case 6:
-            warp_shuffle_impl<6, false>(warp, args);
-            break;
-        case 7:
-            warp_shuffle_impl<7, false>(warp, args);
-            break;
-        case max_num_right_matrices:
-            warp_shuffle_impl<max_num_right_matrices, false>(warp, args);
-            break;
-        default:
-            assert(false);
+    warp_shuffle_impl_right_mats_dispatch<MAX_RIGHT_MATRICES_PER_THREAD, false>(
+        warp,
+        thread_num_right_matrices,
+        args
+    );
+}
+
+template<dsize_t MAX_RIGHT_MATRICES_PER_THREAD, typename T, typename RES>
+__host__ void ccn_warp_shuffle_right_mats_dispatch(
+    const T* __restrict__ left,
+    const T* __restrict__ right,
+    RES* __restrict__ out,
+    dsize2_t matrix_size,
+    dsize2_t search_size,
+    dsize_t num_right_matrices,
+    dsize_t warps_per_thread_block,
+    dsize_t right_matrices_per_thread
+) {
+    if constexpr(MAX_RIGHT_MATRICES_PER_THREAD == 0) {
+        // Silence the unused parameter warning
+        (void)left;
+        (void)right;
+        (void)out;
+        (void)matrix_size;
+        (void)search_size;
+        (void)num_right_matrices;
+        (void)warps_per_thread_block;
+        (void)right_matrices_per_thread;
+    } else {
+        if (MAX_RIGHT_MATRICES_PER_THREAD == right_matrices_per_thread) {
+            dim3 num_threads(warp_size, warps_per_thread_block);
+
+            dsize_t num_matrix_groups = div_up(num_right_matrices, right_matrices_per_thread);
+            dsize_t blocks_per_matrix_group = div_up(search_size.x, num_threads.x);
+
+
+            dim3 num_blocks(
+                blocks_per_matrix_group * num_matrix_groups,
+                div_up(search_size.y, num_threads.y)
+            );
+
+            ccn_warp_shuffle<MAX_RIGHT_MATRICES_PER_THREAD><<<num_blocks, num_threads>>>(
+                left,
+                right,
+                out,
+                matrix_size,
+                search_size,
+                num_right_matrices
+            );
+        } else {
+            ccn_warp_shuffle_right_mats_dispatch<MAX_RIGHT_MATRICES_PER_THREAD>(
+                left,
+                right,
+                out,
+                matrix_size,
+                search_size,
+                num_right_matrices,
+                warps_per_thread_block,
+                right_matrices_per_thread
+            );
+        }
     }
 }
 
@@ -362,7 +417,7 @@ __global__ void ccn_warp_shuffle(
  * @param matrix_size
  * @param search_size
  */
-template<typename DIST, typename T, typename RES>
+template<dsize_t MAX_RIGHT_MATRICES_PER_THREAD, typename DIST, typename T, typename RES>
 __global__ void ccn_warp_shuffle_work_distribution(
     const T* __restrict__ left,
     const T* __restrict__ right,
@@ -370,7 +425,6 @@ __global__ void ccn_warp_shuffle_work_distribution(
     dsize2_t matrix_size,
     dsize2_t search_size,
     dsize_t num_right_matrices,
-    dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread
 ) {
 
@@ -384,7 +438,7 @@ __global__ void ccn_warp_shuffle_work_distribution(
     get_matrix_group(
         search_size.x,
         ctb.group_index().x,
-        right_matrices_per_thread,
+        MAX_RIGHT_MATRICES_PER_THREAD,
         warp_output_x_offset,
         matrix_group_start_idx
     );
@@ -467,7 +521,7 @@ __global__ void ccn_warp_shuffle_work_distribution(
     dsize_t warp_y_right_end = min(warp_y_right_start + rows_per_worker, shared_y_right_end);
 
 
-    dsize_t thread_num_right_matrices = min(num_right_matrices - matrix_group_start_idx, right_matrices_per_thread);
+    dsize_t thread_num_right_matrices = min(num_right_matrices - matrix_group_start_idx, MAX_RIGHT_MATRICES_PER_THREAD);
 
     auto args = create_warp_shuffle_impl_args(
         left,
@@ -481,33 +535,77 @@ __global__ void ccn_warp_shuffle_work_distribution(
         search_size
     );
 
-    switch (thread_num_right_matrices) {
-        case 1:
-            warp_shuffle_impl<1, true>(warp, args);
-            break;
-        case 2:
-            warp_shuffle_impl<2, true>(warp, args);
-            break;
-        case 3:
-            warp_shuffle_impl<3, true>(warp, args);
-            break;
-        case 4:
-            warp_shuffle_impl<4, true>(warp, args);
-            break;
-        case 5:
-            warp_shuffle_impl<5, true>(warp, args);
-            break;
-        case 6:
-            warp_shuffle_impl<6, true>(warp, args);
-            break;
-        case 7:
-            warp_shuffle_impl<7, true>(warp, args);
-            break;
-        case max_num_right_matrices:
-            warp_shuffle_impl<max_num_right_matrices, true>(warp, args);
-            break;
-        default:
-            assert(false);
+    warp_shuffle_impl_right_mats_dispatch<MAX_RIGHT_MATRICES_PER_THREAD, true>(
+        warp,
+        thread_num_right_matrices,
+        args
+    );
+}
+
+template<dsize_t MAX_RIGHT_MATRICES_PER_THREAD, typename DIST, typename T, typename RES>
+__host__ void ccn_warp_shuffle_work_distribution_right_mats_dispatch(
+    const T* __restrict__ left,
+    const T* __restrict__ right,
+    RES* __restrict__ out,
+    dsize2_t matrix_size,
+    dsize2_t search_size,
+    dsize_t num_right_matrices,
+    dsize_t warps_per_thread_block,
+    dsize_t right_matrices_per_thread,
+    dsize_t max_rows_per_thread,
+    cudaStream_t cuda_stream
+) {
+    if constexpr(MAX_RIGHT_MATRICES_PER_THREAD == 0) {
+        // Silence the unused parameter warning
+        (void)left;
+        (void)right;
+        (void)out;
+        (void)matrix_size;
+        (void)search_size;
+        (void)num_right_matrices;
+        (void)warps_per_thread_block;
+        (void)right_matrices_per_thread;
+        (void)max_rows_per_thread;
+        (void)cuda_stream;
+    } else {
+        if (MAX_RIGHT_MATRICES_PER_THREAD == right_matrices_per_thread) {
+            dsize_t num_workers = DIST::num_workers(max_rows_per_thread, matrix_size.y, search_size.y);
+
+            // Each row of cuda block corresponds to a single warp for simplified code
+            constexpr dsize_t block_x_size = warp_size;
+
+            dsize_t num_matrix_groups = div_up(num_right_matrices, right_matrices_per_thread);
+            dsize_t blocks_per_matrix_group = div_up(search_size.x, block_x_size);
+
+            dim3 num_threads(block_x_size, warps_per_thread_block);
+            dim3 num_blocks(
+                blocks_per_matrix_group * num_matrix_groups,
+                div_up(num_workers, num_threads.y)
+            );
+
+            ccn_warp_shuffle_work_distribution<MAX_RIGHT_MATRICES_PER_THREAD, DIST><<<num_blocks, num_threads, 0, cuda_stream>>>(
+                left,
+                right,
+                out,
+                matrix_size,
+                search_size,
+                num_right_matrices,
+                max_rows_per_thread
+            );
+        } else {
+            ccn_warp_shuffle_work_distribution_right_mats_dispatch<MAX_RIGHT_MATRICES_PER_THREAD, DIST>(
+                left,
+                right,
+                out,
+                matrix_size,
+                search_size,
+                num_right_matrices,
+                warps_per_thread_block,
+                right_matrices_per_thread,
+                max_rows_per_thread,
+                cuda_stream
+            );
+        }
     }
 }
 
@@ -528,34 +626,24 @@ void run_ccn_warp_shuffle(
         throw std::runtime_error("Too many rows per block: "s + std::to_string(cuda_rows_per_block) + " (max 32)");
     }
 
-    if (right_matrices_per_thread == 0 || right_matrices_per_thread > max_num_right_matrices) {
+    if (right_matrices_per_thread == 0 || right_matrices_per_thread > right_matrices_per_thread_limit) {
         throw std::runtime_error(
             "Invalid number of right matrices per thread: "s +
             std::to_string(right_matrices_per_thread) +
             " [1-"s +
-            std::to_string(max_num_right_matrices) +
+            std::to_string(right_matrices_per_thread_limit) +
             "]"s
         );
     }
 
-    dim3 num_threads(warp_size, cuda_rows_per_block);
-
-    dsize_t num_matrix_groups = div_up(num_right_matrices, right_matrices_per_thread);
-    dsize_t blocks_per_matrix_group = div_up(search_size.x, num_threads.x);
-
-
-    dim3 num_blocks(
-        blocks_per_matrix_group * num_matrix_groups,
-        div_up(search_size.y, num_threads.y)
-    );
-
-    ccn_warp_shuffle<<<num_blocks, num_threads>>>(
+    ccn_warp_shuffle_right_mats_dispatch<right_matrices_per_thread_limit>(
         left,
         right,
         out,
         matrix_size,
         search_size,
         num_right_matrices,
+        cuda_rows_per_block,
         right_matrices_per_thread
     );
 }
@@ -571,44 +659,32 @@ void run_ccn_warp_shuffle_work_distribution(
     dsize_t cuda_rows_per_block,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread,
-    cudaStream_t cudaStream
+    cudaStream_t cuda_stream
 ) {
     if (cuda_rows_per_block > 32) {
         throw std::runtime_error("Too many rows per block: "s + std::to_string(cuda_rows_per_block) + " (max 32)");
     }
 
-    if (right_matrices_per_thread > max_num_right_matrices) {
+    if (right_matrices_per_thread > right_matrices_per_thread_limit) {
         throw std::runtime_error("Too many right matrices per thread: "s +
                                  std::to_string(right_matrices_per_thread) +
                                  " (max "s +
-                                 std::to_string(max_num_right_matrices) +
+                                 std::to_string(right_matrices_per_thread_limit) +
                                  ")"s
         );
     }
 
-    dsize_t num_workers = DIST::num_workers(max_rows_per_thread, matrix_size.y, search_size.y);
-
-    // Each row of cuda block corresponds to a single warp for simplified code
-    constexpr dsize_t block_x_size = warp_size;
-
-    dsize_t num_matrix_groups = div_up(num_right_matrices, right_matrices_per_thread);
-    dsize_t blocks_per_matrix_group = div_up(search_size.x, block_x_size);
-
-    dim3 num_threads(block_x_size, cuda_rows_per_block);
-    dim3 num_blocks(
-        blocks_per_matrix_group * num_matrix_groups,
-        div_up(num_workers, num_threads.y)
-    );
-
-    ccn_warp_shuffle_work_distribution<DIST><<<num_blocks, num_threads, 0, cudaStream>>>(
+    ccn_warp_shuffle_work_distribution_right_mats_dispatch<right_matrices_per_thread_limit, DIST>(
         left,
         right,
         out,
         matrix_size,
         search_size,
         num_right_matrices,
+        cuda_rows_per_block,
         right_matrices_per_thread,
-        max_rows_per_thread
+        max_rows_per_thread,
+        cuda_stream
     );
 }
 
@@ -655,7 +731,7 @@ template void run_ccn_warp_shuffle_work_distribution<triangle_distribution, int,
     dsize_t cuda_rows_per_block,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread,
-    cudaStream_t cudaStream
+    cudaStream_t cuda_stream
 );
 
 template void run_ccn_warp_shuffle_work_distribution<triangle_distribution, float, float>(
@@ -668,7 +744,7 @@ template void run_ccn_warp_shuffle_work_distribution<triangle_distribution, floa
     dsize_t cuda_rows_per_block,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread,
-    cudaStream_t cudaStream
+    cudaStream_t cuda_stream
 );
 
 template void run_ccn_warp_shuffle_work_distribution<triangle_distribution, double, double>(
@@ -681,7 +757,7 @@ template void run_ccn_warp_shuffle_work_distribution<triangle_distribution, doub
     dsize_t cuda_rows_per_block,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread,
-    cudaStream_t cudaStream
+    cudaStream_t cuda_stream
 );
 
 template void run_ccn_warp_shuffle_work_distribution<rectangle_distribution, int, int>(
@@ -694,7 +770,7 @@ template void run_ccn_warp_shuffle_work_distribution<rectangle_distribution, int
     dsize_t cuda_rows_per_block,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread,
-    cudaStream_t cudaStream
+    cudaStream_t cuda_stream
 );
 
 template void run_ccn_warp_shuffle_work_distribution<rectangle_distribution, float, float>(
@@ -707,7 +783,7 @@ template void run_ccn_warp_shuffle_work_distribution<rectangle_distribution, flo
     dsize_t cuda_rows_per_block,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread,
-    cudaStream_t cudaStream
+    cudaStream_t cuda_stream
 );
 
 template void run_ccn_warp_shuffle_work_distribution<rectangle_distribution, double, double>(
@@ -720,7 +796,7 @@ template void run_ccn_warp_shuffle_work_distribution<rectangle_distribution, dou
     dsize_t cuda_rows_per_block,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread,
-    cudaStream_t cudaStream
+    cudaStream_t cuda_stream
 );
 
 template void run_ccn_warp_shuffle_work_distribution<no_distribution, int, int>(
@@ -733,7 +809,7 @@ template void run_ccn_warp_shuffle_work_distribution<no_distribution, int, int>(
     dsize_t cuda_rows_per_block,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread,
-    cudaStream_t cudaStream
+    cudaStream_t cuda_stream
 );
 
 template void run_ccn_warp_shuffle_work_distribution<no_distribution, float, float>(
@@ -746,7 +822,7 @@ template void run_ccn_warp_shuffle_work_distribution<no_distribution, float, flo
     dsize_t cuda_rows_per_block,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread,
-    cudaStream_t cudaStream
+    cudaStream_t cuda_stream
 );
 
 template void run_ccn_warp_shuffle_work_distribution<no_distribution, double, double>(
@@ -759,7 +835,7 @@ template void run_ccn_warp_shuffle_work_distribution<no_distribution, double, do
     dsize_t cuda_rows_per_block,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread,
-    cudaStream_t cudaStream
+    cudaStream_t cuda_stream
 );
 
 }

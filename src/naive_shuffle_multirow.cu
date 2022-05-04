@@ -22,6 +22,8 @@ namespace cross {
 
 namespace {
 
+constexpr dsize_t right_rows_limit = SHUFFLE_MULTIROW_RIGHT_ROWS_LIMIT;
+
 /**
  * Arguments for the warp_shuffle_impl function.
  * As we need to write many calls for different constant values of NUM_RIGHTS which
@@ -316,39 +318,37 @@ __device__ void multirow_shuffle_impl(
     }
 }
 
-constexpr dsize_t max_num_right_rows = 8;
-
-template<dsize_t NUM_RIGHT_ROWS, bool ATOMIC, dsize_t WARP_SIZE, typename T, typename RES>
+template<dsize_t RIGHT_ROWS_PER_THREAD, bool ATOMIC, dsize_t WARP_SIZE, typename T, typename RES>
 __device__ void multirow_shuffle_impl_dispatch(
     const cg::thread_block& ctb,
     const cg::thread_block_tile<WARP_SIZE>& warp,
-    dsize_t num_right_rows,
+    dsize_t right_rows_per_thread,
     const warp_shuffle_impl_args<T, RES>& args,
     RES* __restrict__ res
 ) {
-    if constexpr(NUM_RIGHT_ROWS == 0) {
+    if constexpr(RIGHT_ROWS_PER_THREAD == 0) {
         // Zero is valid, if the warp is completely outside the result matrix
 
         // Silence the unused parameter warning
         (void)ctb;
         (void)warp;
-        (void)num_right_rows;
+        (void)right_rows_per_thread;
         (void)args;
         (void)res;
 
     } else {
-        if (NUM_RIGHT_ROWS == num_right_rows) {
-            multirow_shuffle_impl<NUM_RIGHT_ROWS, ATOMIC>(
+        if (RIGHT_ROWS_PER_THREAD == right_rows_per_thread) {
+            multirow_shuffle_impl<RIGHT_ROWS_PER_THREAD, ATOMIC>(
                 ctb,
                 warp,
                 args,
                 res
             );
         } else {
-            multirow_shuffle_impl_dispatch<NUM_RIGHT_ROWS - 1, ATOMIC>(
+            multirow_shuffle_impl_dispatch<RIGHT_ROWS_PER_THREAD - 1, ATOMIC>(
                 ctb,
                 warp,
-                num_right_rows,
+                right_rows_per_thread,
                 args,
                 res
             );
@@ -362,14 +362,13 @@ __device__ void multirow_shuffle_impl_dispatch(
  * computed by the current warp in the left and right matrices
  * and then always loads 32 values
  */
-template<typename T, typename RES>
+template<dsize_t MAX_RIGHT_ROWS_PER_THREAD, typename T, typename RES>
 __global__ void ccn_multirow_shuffle(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
     dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t max_right_rows
+    dsize2_t search_size
 ) {
     // Initialize by loading a warp worth of data from left matrix
     // as we will be iterating over the left matrix
@@ -398,7 +397,7 @@ __global__ void ccn_multirow_shuffle(
     // All warps of given block start at the same x, but each work on different row of output
     dsize2_t thread0_out_pos{
         ctb.group_index().x * ctb.group_dim().x,
-        (ctb.group_index().y * ctb.group_dim().y + ctb.thread_index().y) * max_right_rows
+        (ctb.group_index().y * ctb.group_dim().y + ctb.thread_index().y) * MAX_RIGHT_ROWS_PER_THREAD
     };
     dsize2_t last_warp_thread_out_pos = thread0_out_pos +
                                         dsize2_t{warp.size() - 1, 0};
@@ -425,7 +424,7 @@ __global__ void ccn_multirow_shuffle(
     vec2<int> warp_max_shift{
         static_cast<int>(min(last_warp_thread_out_pos.x, search_size.x - 1)) - static_cast<int>(half_search_size.x),
         // max_right_rows - 1 because + max_right_rows is the min_shift of next warp
-        static_cast<int>(min(last_warp_thread_out_pos.y + max_right_rows - 1, search_size.y - 1)) -
+        static_cast<int>(min(last_warp_thread_out_pos.y + MAX_RIGHT_ROWS_PER_THREAD - 1, search_size.y - 1)) -
         static_cast<int>(half_search_size.y)
     };
 
@@ -448,7 +447,7 @@ __global__ void ccn_multirow_shuffle(
 
 
     RES* res = shared_memory_proxy<RES>();
-    for (dsize_t i = ctb.thread_rank(); i < max_right_rows * ctb.size(); i += ctb.size()) {
+    for (dsize_t i = ctb.thread_rank(); i < MAX_RIGHT_ROWS_PER_THREAD * ctb.size(); i += ctb.size()) {
         res[i] = 0;
     }
     ctb.sync();
@@ -471,13 +470,66 @@ __global__ void ccn_multirow_shuffle(
         search_size
     );
 
-    multirow_shuffle_impl_dispatch<max_num_right_rows, false>(
+    multirow_shuffle_impl_dispatch<MAX_RIGHT_ROWS_PER_THREAD, false>(
         ctb,
         warp,
         warp_num_right_rows,
         args,
         res
     );
+}
+
+template<dsize_t MAX_RIGHT_ROWS_PER_THREAD, typename T, typename RES>
+__host__ void ccn_multirow_shuffle_dispatch(
+    const T* __restrict__ left,
+    const T* __restrict__ right,
+    RES* __restrict__ out,
+    dsize2_t matrix_size,
+    dsize2_t search_size,
+    dsize_t cuda_rows_per_block,
+    dsize_t right_rows_per_thread
+) {
+    if constexpr(MAX_RIGHT_ROWS_PER_THREAD > 0) {
+        if (MAX_RIGHT_ROWS_PER_THREAD == right_rows_per_thread) {
+            dim3 num_threads(warp_size, cuda_rows_per_block);
+            dim3 num_blocks(
+                div_up(search_size.x, num_threads.x),
+                div_up(search_size.y, num_threads.y * MAX_RIGHT_ROWS_PER_THREAD)
+            );
+
+            dsize_t block_size = num_threads.x * num_threads.y;
+
+            ccn_multirow_shuffle<MAX_RIGHT_ROWS_PER_THREAD><<<num_blocks, num_threads, block_size * MAX_RIGHT_ROWS_PER_THREAD * sizeof(RES)>>>(
+                left,
+                right,
+                out,
+                matrix_size,
+                search_size
+            );
+        } else {
+            ccn_multirow_shuffle_dispatch<MAX_RIGHT_ROWS_PER_THREAD - 1>(
+                left,
+                right,
+                out,
+                matrix_size,
+                search_size,
+                cuda_rows_per_block,
+                right_rows_per_thread
+            );
+        }
+    } else {
+        // TODO: Solve the -Wunused-but-set-parameter warning
+        // Silence the confusing -Wunused-but-set-parameter warning
+        // as we are not setting the parameters anywhere
+        (void)left;
+        (void)right;
+        (void)out;
+        (void)matrix_size;
+        (void)search_size;
+        (void)cuda_rows_per_block;
+        (void)right_rows_per_thread;
+        assert(false);
+    }
 }
 
 } // END anonymous namespace
@@ -490,27 +542,29 @@ void run_ccn_multirow_shuffle(
     dsize2_t matrix_size,
     dsize2_t search_size,
     dsize_t cuda_rows_per_block,
-    dsize_t max_right_rows
+    dsize_t right_rows_per_thread
 ) {
     if (cuda_rows_per_block > 32) {
         throw std::runtime_error("Too many rows per block: "s + std::to_string(cuda_rows_per_block) + " (max 32)");
     }
 
-    dim3 num_threads(warp_size, cuda_rows_per_block);
-    dim3 num_blocks(
-            div_up(search_size.x, num_threads.x),
-            div_up(search_size.y, num_threads.y * max_right_rows)
-    );
+    if (right_rows_per_thread > right_rows_limit) {
+        throw std::runtime_error(
+            "Too many right per thread: "s +
+            std::to_string(right_rows_per_thread) +
+            "(max "s + std::to_string(right_rows_limit) +
+            ")"s
+        );
+    }
 
-    dsize_t block_size = num_threads.x * num_threads.y;
-
-    ccn_multirow_shuffle<<<num_blocks, num_threads, block_size * max_right_rows * sizeof(RES)>>>(
-            left,
-            right,
-            out,
-            matrix_size,
-            search_size,
-            max_right_rows
+    ccn_multirow_shuffle_dispatch<right_rows_limit>(
+        left,
+        right,
+        out,
+        matrix_size,
+        search_size,
+        cuda_rows_per_block,
+        right_rows_per_thread
     );
 }
 
@@ -521,7 +575,7 @@ template void run_ccn_multirow_shuffle<int, int>(
         dsize2_t matrix_size,
         dsize2_t search_size,
         dsize_t cuda_rows_per_block,
-        dsize_t max_right_rows
+        dsize_t right_rows_per_thread
 );
 
 template void run_ccn_multirow_shuffle<float, float>(
@@ -531,7 +585,7 @@ template void run_ccn_multirow_shuffle<float, float>(
         dsize2_t matrix_size,
         dsize2_t search_size,
         dsize_t cuda_rows_per_block,
-        dsize_t max_right_rows
+        dsize_t right_rows_per_thread
 );
 
 template void run_ccn_multirow_shuffle<double, double>(
@@ -541,7 +595,7 @@ template void run_ccn_multirow_shuffle<double, double>(
         dsize2_t matrix_size,
         dsize2_t search_size,
         dsize_t cuda_rows_per_block,
-        dsize_t max_right_rows
+        dsize_t right_rows_per_thread
 );
 
 }

@@ -113,7 +113,7 @@ void run_cross_corr_naive_original(
     dsize2_t search_size,
     dsize_t subregions_per_pic,
     dsize_t batch_size,
-    cudaStream_t cudaStream = nullptr
+    cudaStream_t cuda_stream = nullptr
 ) {
     dim3 num_threads(16, 16);
     dim3 num_blocks(
@@ -121,7 +121,7 @@ void run_cross_corr_naive_original(
         div_up(search_size.y, num_threads.y)
     );
 
-    cross_corr_naive_original<<<num_blocks, num_threads, 0, cudaStream>>>(
+    cross_corr_naive_original<<<num_blocks, num_threads, 0, cuda_stream>>>(
         ref,
         deformed,
         out,
@@ -140,7 +140,7 @@ template void run_cross_corr_naive_original<int, int>(
     dsize2_t search_size,
     dsize_t subregions_per_pic,
     dsize_t batch_size,
-    cudaStream_t cudaStream
+    cudaStream_t cuda_stream
 );
 
 template void run_cross_corr_naive_original<float, float>(
@@ -151,7 +151,7 @@ template void run_cross_corr_naive_original<float, float>(
     dsize2_t search_size,
     dsize_t subregions_per_pic,
     dsize_t batch_size,
-    cudaStream_t cudaStream
+    cudaStream_t cuda_stream
 );
 
 template void run_cross_corr_naive_original<double, double>(
@@ -162,7 +162,7 @@ template void run_cross_corr_naive_original<double, double>(
     dsize2_t search_size,
     dsize_t subregions_per_pic,
     dsize_t batch_size,
-    cudaStream_t cudaStream
+    cudaStream_t cuda_stream
 );
 
 }

@@ -12,6 +12,99 @@ else()
     project(CROSS LANGUAGES C CXX CUDA)
 endif()
 
+# List in format <option_name>:<release value>:<debug value>:<description>
+set(ALG_LIMIT_OPTIONS
+        "SHUFFLE_RIGHT_MATRICES_PER_THREAD_LIMIT:8:4:Maximum value of num_right_rows to generate code for"
+
+        "SHUFFLE_MULTIROW_RIGHT_ROWS_LIMIT:8:4:Maximum value of right_rows to generate code for"
+
+        "SHUFFLE_MULTILEFT_SHIFTS_PER_THREAD_LIMIT:8:4:Maximum value of shifts_per_thread to generate code for"
+        "SHUFFLE_MULTILEFT_LEFT_ROWS_LIMIT:4:2:Maximum value of left_rows to generate code for"
+
+        "SHUFFLE_MULTILEFT_ORIG_SHIFTS_PER_THREAD_LIMIT:8:4:Maximum value of shifts_per_thread to generate code for"
+        "SHUFFLE_MULTILEFT_ORIG_LEFT_ROWS_LIMIT:4:2:Maximum value of left_rows to generate code for"
+
+        "SHUFFLE_MULTIROW_MULTIRIGHT_RIGHT_ROWS_LIMIT:4:2:Maximum value of right_rows to generate code for"
+        "SHUFFLE_MULTIROW_MULTIRIGHT_RIGHT_MATS_LIMIT:4:2:Maximum value of right_mats to generate code for"
+
+        "SHUFFLE_N_TO_M_LEFT_MATRICES_PER_THREAD_LIMIT:4:2:Maximum value of left_matrices_per_thread to generate code for"
+        "SHUFFLE_N_TO_M_RIGHT_MATRICES_PER_THREAD_LIMIT:4:2:Maximum value of right_matrices_per_thread to generate code for"
+
+        "SHUFFLE_N_TO_M_ORIG_LEFT_MATRICES_PER_THREAD_LIMIT:4:2:Maximum value of left_matrices_per_thread to generate code for"
+        "SHUFFLE_N_TO_M_ORIG_RIGHT_MATRICES_PER_THREAD_LIMIT:4:2:Maximum value of right_matrices_per_thread to generate code for"
+
+        "SHUFFLE_N_TO_M_MULTIROW_SHIFTS_PER_THREAD_PER_RIGHT_MATRIX_LIMIT:4:2:Maximum value of shifts_per_thread_per_right_matrix to generate code for"
+        "SHUFFLE_N_TO_M_MULTIROW_RIGHT_MATRICES_PER_THREAD_LIMIT:4:2:Maximum value of right_matrices_per_thread to generate code for"
+        "SHUFFLE_N_TO_M_MULTIROW_LEFT_MATRICES_PER_THREAD_LIMIT:4:2:Maximum value of left_matrices_per_thread to generate code for"
+        "SHUFFLE_N_TO_M_MULTIROW_LEFT_ROWS_PER_ITERATION_LIMIT:4:2:Maximum value of left_rows_per_iteration to generate code for"
+
+        "SHUFFLE_N_TO_MN_SHIFTS_PER_RIGHT_MATRIX_LIMIT:4:2:Maximum value of shifts_per_right_matrix to generate code for"
+        "SHUFFLE_N_TO_MN_RIGHT_MATRICES_PER_THREAD_LIMIT:4:2:Maximum value of right_matrices_per_thread to generate code for"
+        "SHUFFLE_N_TO_MN_LEFT_ROWS_PER_ITERATION_LIMIT:4:2:Maximum value of left_rows_per_iteration to generate code for"
+
+        "WARP_PER_SHIFT_SHARED_MEM_RIGHT_MATRICES_PER_BLOCK_LIMIT:8:4:Maximum value of right_matrices_per_block to generate code for"
+)
+
+function(get_alg_option_part ALG_OPTION PART_START)
+    string(SUBSTRING "${ALG_OPTION}" "${PART_START}" -1 SEARCHED_PART)
+    string(FIND "${SEARCHED_PART}" ":" POS)
+    string(SUBSTRING "${SEARCHED_PART}" 0 "${POS}" OPTION_PART)
+
+    math(EXPR NEXT_PART_START "${PART_START} + ${POS} + 1")
+    set(RETURN_VAL "${OPTION_PART}" PARENT_SCOPE)
+    set(RETURN_POS "${NEXT_PART_START}" PARENT_SCOPE)
+endfunction()
+
+function(parse_alg_limit_option ALG_LIMIT_OPTION)
+    get_alg_option_part("${ALG_LIMIT_OPTION}" 0)
+    if (RETURN_POS EQUAL 0)
+        message(WARNING "Malformed alg limit option (no option name): ${ALG_LIMIT_OPTION}")
+        return()
+    endif()
+    set(RET_OPTION_NAME "${RETURN_VAL}" PARENT_SCOPE)
+    set(NEXT_PART_START "${RETURN_POS}")
+
+    get_alg_option_part("${ALG_LIMIT_OPTION}" "${RETURN_POS}")
+    if (RETURN_POS EQUAL NEXT_PART_START)
+        message(WARNING "Malformed alg limit option (no release value): ${ALG_LIMIT_OPTION}")
+        unset(RET_OPTION_NAME PARENT_SCOPE)
+        return()
+    endif()
+    set(RET_RELEASE_VALUE "${RETURN_VAL}" PARENT_SCOPE)
+    set(NEXT_PART_START "${RETURN_POS}")
+
+    get_alg_option_part("${ALG_LIMIT_OPTION}" "${RETURN_POS}")
+    if (RETURN_POS EQUAL NEXT_PART_START)
+        message(WARNING "Malformed alg limit option (no debug value): ${ALG_LIMIT_OPTION}")
+        unset(RET_OPTION_NAME PARENT_SCOPE)
+        unset(RET_RELEASE_VALUE PARENT_SCOPE)
+        return()
+    endif()
+    set(RET_DEBUG_VALUE "${RETURN_VAL}" PARENT_SCOPE)
+    set(NEXT_PART_START "${RETURN_POS}")
+
+    get_alg_option_part("${ALG_LIMIT_OPTION}" "${RETURN_POS}")
+    if (NOT RETURN_POS EQUAL NEXT_PART_START)
+        message(WARNING "Malformed alg limit option (no description): ${ALG_LIMIT_OPTION}")
+        unset(RET_OPTION_NAME PARENT_SCOPE)
+        unset(RET_RELEASE_VALUE PARENT_SCOPE)
+        unset(RET_DEBUG_VALUE PARENT_SCOPE)
+        return()
+    endif()
+    set(RET_DESCRIPTION "${RETURN_VAL}" PARENT_SCOPE)
+endfunction()
+
+
+
+foreach(ALG_LIMIT_OPTION IN LISTS ALG_LIMIT_OPTIONS)
+    parse_alg_limit_option("${ALG_LIMIT_OPTION}")
+    if (NOT DEFINED RET_OPTION_NAME)
+        continue()
+    endif()
+
+    # TODO: Maybe set debug version of the variable
+    set("${RET_OPTION_NAME}" "${RET_RELEASE_VALUE}" CACHE STRING "${RET_DESCRIPTION}")
+endforeach()
 
 
 set(CMAKE_CXX_STANDARD 17)
@@ -74,3 +167,11 @@ target_compile_options(cross PRIVATE $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:R
 
 target_compile_options(cross PRIVATE $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Debug>>:-g -rdynamic>)
 target_compile_options(cross PRIVATE $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>:-G -Xcompiler -rdynamic>)
+
+foreach(ALG_LIMIT_OPTION IN LISTS ALG_LIMIT_OPTIONS)
+    parse_alg_limit_option("${ALG_LIMIT_OPTION}")
+    if (NOT DEFINED RET_OPTION_NAME)
+        continue()
+    endif()
+    target_compile_definitions(cross PRIVATE "${RET_OPTION_NAME}=$<IF:$<CONFIG:Release>,${RET_RELEASE_VALUE},${RET_DEBUG_VALUE}>")
+endforeach()

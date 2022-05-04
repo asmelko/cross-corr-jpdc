@@ -21,8 +21,8 @@ namespace cross {
 
 namespace {
 
-constexpr dsize_t max_num_left_matrices = 4;
-constexpr dsize_t max_num_right_matrices = 4;
+constexpr dsize_t left_matrices_per_thread_limit = SHUFFLE_N_TO_M_LEFT_MATRICES_PER_THREAD_LIMIT;
+constexpr dsize_t right_matrices_per_thread_limit = SHUFFLE_N_TO_M_RIGHT_MATRICES_PER_THREAD_LIMIT;
 
 /**
  * Arguments for the warp_shuffle_impl function.
@@ -290,7 +290,7 @@ __device__ void warp_shuffle_impl_dispatch_num_lefts(
  * @param matrix_size
  * @param search_size
  */
-template<typename DIST, typename T, typename RES>
+template<dsize_t MAX_LEFT_MATRICES_PER_THREAD, dsize_t MAX_RIGHT_MATRICES_PER_THREAD, typename DIST, typename T, typename RES>
 __global__ void ccn_warp_shuffle_n_to_m_work_distribution(
     const T* __restrict__ left,
     const T* __restrict__ right,
@@ -299,8 +299,6 @@ __global__ void ccn_warp_shuffle_n_to_m_work_distribution(
     dsize2_t search_size,
     dsize_t num_left_matrices,
     dsize_t num_right_matrices,
-    dsize_t left_matrices_per_thread,
-    dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread
 ) {
 
@@ -328,8 +326,8 @@ __global__ void ccn_warp_shuffle_n_to_m_work_distribution(
     dsize_t warp_output_x_offset = matrix_group_block_offset * warp_size;
 
     // Index of the first matrix in the group processed by the current thread
-    dsize_t left_matrix_group_start_idx = left_matrix_group_idx * left_matrices_per_thread;
-    dsize_t right_matrix_group_start_idx = right_matrix_group_idx * right_matrices_per_thread;
+    dsize_t left_matrix_group_start_idx = left_matrix_group_idx * MAX_LEFT_MATRICES_PER_THREAD;
+    dsize_t right_matrix_group_start_idx = right_matrix_group_idx * MAX_RIGHT_MATRICES_PER_THREAD;
 
     // Distribute rows of a single shift between multiple workers,
     // in this case threads
@@ -408,9 +406,9 @@ __global__ void ccn_warp_shuffle_n_to_m_work_distribution(
     dsize_t warp_y_right_start = shared_y_right_start + work.worker_idx * rows_per_worker;
     dsize_t warp_y_right_end = min(warp_y_right_start + rows_per_worker, shared_y_right_end);
 
-    dsize_t thread_num_left_matrices = min(num_left_matrices - left_matrix_group_start_idx, left_matrices_per_thread);
+    dsize_t thread_num_left_matrices = min(num_left_matrices - left_matrix_group_start_idx, MAX_LEFT_MATRICES_PER_THREAD);
     dsize_t thread_num_right_matrices = min(
-        num_right_matrices - right_matrix_group_start_idx, right_matrices_per_thread
+        num_right_matrices - right_matrix_group_start_idx, MAX_RIGHT_MATRICES_PER_THREAD
     );
 
     auto args = create_warp_shuffle_impl_args(
@@ -426,13 +424,155 @@ __global__ void ccn_warp_shuffle_n_to_m_work_distribution(
         num_right_matrices
     );
 
-    warp_shuffle_impl_dispatch_num_lefts<max_num_left_matrices, max_num_right_matrices, true>(
+    warp_shuffle_impl_dispatch_num_lefts<MAX_LEFT_MATRICES_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD, true>(
         warp,
         thread_num_left_matrices,
         thread_num_right_matrices,
         args
     );
 }
+
+template<dsize_t MAX_LEFT_MATRICES_PER_THREAD, dsize_t MAX_RIGHT_MATRICES_PER_THREAD, typename DIST, typename T, typename RES>
+__host__ void ccn_warp_shuffle_n_to_m_work_distribution_right_mat_dispatch(
+    const T* __restrict__ left,
+    const T* __restrict__ right,
+    RES* __restrict__ out,
+    dsize2_t matrix_size,
+    dsize2_t search_size,
+    dsize_t num_left_matrices,
+    dsize_t num_right_matrices,
+    dsize_t cuda_rows_per_block,
+    dsize_t right_matrices_per_thread,
+    dsize_t max_rows_per_thread
+) {
+    if constexpr(MAX_RIGHT_MATRICES_PER_THREAD > 0) {
+        if (MAX_RIGHT_MATRICES_PER_THREAD == right_matrices_per_thread) {
+            dsize_t num_workers = DIST::num_workers(max_rows_per_thread, matrix_size.y, search_size.y);
+
+            // Each row of cuda block corresponds to a single warp for simplified code
+            constexpr dsize_t block_x_size = warp_size;
+
+            // There will be total of num_left_matrix_groups * num_right_matrix_groups matrix_groups
+            dsize_t num_left_matrix_groups = div_up(num_left_matrices, MAX_LEFT_MATRICES_PER_THREAD);
+            dsize_t num_right_matrix_groups = div_up(num_right_matrices, MAX_RIGHT_MATRICES_PER_THREAD);
+            // Each shift is still computed by a single thread (in the x axis), so we need as many threads
+            // as there are shifts, in each matrix group
+            dsize_t blocks_per_matrix_group = div_up(search_size.x, block_x_size);
+
+            dim3 num_threads(block_x_size, cuda_rows_per_block);
+            dim3 num_blocks(
+                // Encodes the shift in x direction and the left matrix group the thread belongs to
+                blocks_per_matrix_group * num_left_matrix_groups,
+                // Encodes the right matrix group the thread belongs to
+                num_right_matrix_groups,
+                // Encodes distribution of matrix rows between threads
+                div_up(num_workers, num_threads.y)
+            );
+
+            ccn_warp_shuffle_n_to_m_work_distribution<MAX_LEFT_MATRICES_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD, DIST><<<num_blocks, num_threads>>>(
+                left,
+                right,
+                out,
+                matrix_size,
+                search_size,
+                num_left_matrices,
+                num_right_matrices,
+                max_rows_per_thread
+            );
+        } else {
+            ccn_warp_shuffle_n_to_m_work_distribution_right_mat_dispatch<MAX_LEFT_MATRICES_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD - 1, DIST>(
+                left,
+                right,
+                out,
+                matrix_size,
+                search_size,
+                num_left_matrices,
+                num_right_matrices,
+                cuda_rows_per_block,
+                right_matrices_per_thread,
+                max_rows_per_thread
+            );
+        }
+    } else {
+        // TODO: Solve the -Wunused-but-set-parameter warning
+        // Silence the confusing -Wunused-but-set-parameter warning
+        // as we are not setting the parameters anywhere
+        (void)left;
+        (void)right;
+        (void)out;
+        (void)matrix_size;
+        (void)search_size;
+        (void)num_left_matrices;
+        (void)num_right_matrices;
+        (void)cuda_rows_per_block;
+        (void)right_matrices_per_thread;
+        (void)max_rows_per_thread;
+        assert(false);
+    }
+}
+
+template<dsize_t MAX_LEFT_MATRICES_PER_THREAD, dsize_t MAX_RIGHT_MATRICES_PER_THREAD, typename DIST, typename T, typename RES>
+__host__ void ccn_warp_shuffle_n_to_m_work_distribution_left_mat_dispatch(
+    const T* __restrict__ left,
+    const T* __restrict__ right,
+    RES* __restrict__ out,
+    dsize2_t matrix_size,
+    dsize2_t search_size,
+    dsize_t num_left_matrices,
+    dsize_t num_right_matrices,
+    dsize_t cuda_rows_per_block,
+    dsize_t left_matrices_per_thread,
+    dsize_t right_matrices_per_thread,
+    dsize_t max_rows_per_thread
+) {
+    if constexpr(MAX_LEFT_MATRICES_PER_THREAD > 0) {
+        if (MAX_LEFT_MATRICES_PER_THREAD == left_matrices_per_thread) {
+            ccn_warp_shuffle_n_to_m_work_distribution_right_mat_dispatch<MAX_LEFT_MATRICES_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD, DIST>(
+                left,
+                right,
+                out,
+                matrix_size,
+                search_size,
+                num_left_matrices,
+                num_right_matrices,
+                cuda_rows_per_block,
+                right_matrices_per_thread,
+                max_rows_per_thread
+            );
+        } else {
+            ccn_warp_shuffle_n_to_m_work_distribution_left_mat_dispatch<MAX_LEFT_MATRICES_PER_THREAD - 1, MAX_RIGHT_MATRICES_PER_THREAD, DIST>(
+                left,
+                right,
+                out,
+                matrix_size,
+                search_size,
+                num_left_matrices,
+                num_right_matrices,
+                cuda_rows_per_block,
+                left_matrices_per_thread,
+                right_matrices_per_thread,
+                max_rows_per_thread
+            );
+        }
+    } else {
+        // TODO: Solve the -Wunused-but-set-parameter warning
+        // Silence the confusing -Wunused-but-set-parameter warning
+        // as we are not setting the parameters anywhere
+        (void)left;
+        (void)right;
+        (void)out;
+        (void)matrix_size;
+        (void)search_size;
+        (void)num_left_matrices;
+        (void)num_right_matrices;
+        (void)cuda_rows_per_block;
+        (void)left_matrices_per_thread;
+        (void)right_matrices_per_thread;
+        (void)max_rows_per_thread;
+        assert(false);
+    }
+}
+
 
 } // END anonymous namespace
 
@@ -454,47 +594,25 @@ void run_ccn_warp_shuffle_n_to_m_work_distribution(
         throw std::runtime_error("Too many rows per block: "s + std::to_string(cuda_rows_per_block) + " (max 32)");
     }
 
-    if (left_matrices_per_thread > max_num_left_matrices) {
+    if (left_matrices_per_thread > left_matrices_per_thread_limit) {
         throw std::runtime_error("Too many left matrices per thread: "s +
                                  std::to_string(right_matrices_per_thread) +
                                  " (max "s +
-                                 std::to_string(max_num_left_matrices) +
+                                 std::to_string(left_matrices_per_thread_limit) +
                                  ")"s
         );
     }
 
-    if (right_matrices_per_thread > max_num_right_matrices) {
+    if (right_matrices_per_thread > right_matrices_per_thread_limit) {
         throw std::runtime_error("Too many right matrices per thread: "s +
                                  std::to_string(right_matrices_per_thread) +
                                  " (max "s +
-                                 std::to_string(max_num_right_matrices) +
+                                 std::to_string(right_matrices_per_thread_limit) +
                                  ")"s
         );
     }
 
-    dsize_t num_workers = DIST::num_workers(max_rows_per_thread, matrix_size.y, search_size.y);
-
-    // Each row of cuda block corresponds to a single warp for simplified code
-    constexpr dsize_t block_x_size = warp_size;
-
-    // There will be total of num_left_matrix_groups * num_right_matrix_groups matrix_groups
-    dsize_t num_left_matrix_groups = div_up(num_left_matrices, left_matrices_per_thread);
-    dsize_t num_right_matrix_groups = div_up(num_right_matrices, right_matrices_per_thread);
-    // Each shift is still computed by a single thread (in the x axis), so we need as many threads
-    // as there are shifts, in each matrix group
-    dsize_t blocks_per_matrix_group = div_up(search_size.x, block_x_size);
-
-    dim3 num_threads(block_x_size, cuda_rows_per_block);
-    dim3 num_blocks(
-        // Encodes the shift in x direction and the left matrix group the thread belongs to
-        blocks_per_matrix_group * num_left_matrix_groups,
-        // Encodes the right matrix group the thread belongs to
-        num_right_matrix_groups,
-        // Encodes distribution of matrix rows between threads
-        div_up(num_workers, num_threads.y)
-    );
-
-    ccn_warp_shuffle_n_to_m_work_distribution<DIST><<<num_blocks, num_threads>>>(
+    ccn_warp_shuffle_n_to_m_work_distribution_left_mat_dispatch<left_matrices_per_thread_limit, right_matrices_per_thread_limit, DIST>(
         left,
         right,
         out,
@@ -502,6 +620,7 @@ void run_ccn_warp_shuffle_n_to_m_work_distribution(
         search_size,
         num_left_matrices,
         num_right_matrices,
+        cuda_rows_per_block,
         left_matrices_per_thread,
         right_matrices_per_thread,
         max_rows_per_thread

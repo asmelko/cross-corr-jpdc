@@ -22,8 +22,8 @@ namespace cross {
 
 namespace {
 
-constexpr dsize_t max_num_right_rows = 4;
-constexpr dsize_t max_num_right_mats = 4;
+constexpr dsize_t right_rows_limit = SHUFFLE_MULTIROW_MULTIRIGHT_RIGHT_ROWS_LIMIT;
+constexpr dsize_t right_mats_limit = SHUFFLE_MULTIROW_MULTIRIGHT_RIGHT_MATS_LIMIT;
 
 /**
  * Arguments for the warp_shuffle_impl function.
@@ -409,16 +409,14 @@ __device__ void multirow_multiright_shuffle_impl_rows_dispatch(
 }
 
 
-template<typename T, typename RES>
+template<dsize_t MAX_RIGHT_ROWS_PER_THREAD, dsize_t MAX_RIGHT_MATRICES_PER_THREAD, typename T, typename RES>
 __global__ void ccn_multirow_multiright_shuffle(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t num_right_matrices,
-    dsize_t max_right_rows,
-    dsize_t right_matrices_per_thread
+    dsize_t num_right_matrices
 ) {
 
     cg::thread_block ctb = cg::this_thread_block();
@@ -429,12 +427,12 @@ __global__ void ccn_multirow_multiright_shuffle(
     dsize_t matrix_group_block_offset = ctb.group_index().x % blocks_per_matrix_group;
 
     dsize_t output_x_offset = matrix_group_block_offset * warp_size;
-    dsize_t matrix_group_start_idx = matrix_group_idx * right_matrices_per_thread;
+    dsize_t matrix_group_start_idx = matrix_group_idx * MAX_RIGHT_MATRICES_PER_THREAD;
 
     // All warps of given block start at the same x, but each work on different row of output
     dsize2_t thread0_out_pos{
         output_x_offset,
-        (ctb.group_index().y * ctb.group_dim().y + ctb.thread_index().y) * max_right_rows
+        (ctb.group_index().y * ctb.group_dim().y + ctb.thread_index().y) * MAX_RIGHT_ROWS_PER_THREAD
     };
     dsize2_t last_warp_thread_out_pos = thread0_out_pos +
                                         dsize2_t{warp.size() - 1, 0};
@@ -461,7 +459,7 @@ __global__ void ccn_multirow_multiright_shuffle(
     vec2<int> warp_max_shift{
         static_cast<int>(min(last_warp_thread_out_pos.x, search_size.x - 1)) - static_cast<int>(half_search_size.x),
         // max_right_rows - 1 because + max_right_rows is the min_shift of next warp
-        static_cast<int>(min(last_warp_thread_out_pos.y + max_right_rows - 1, search_size.y - 1)) -
+        static_cast<int>(min(last_warp_thread_out_pos.y + MAX_RIGHT_ROWS_PER_THREAD - 1, search_size.y - 1)) -
         static_cast<int>(half_search_size.y)
     };
 
@@ -484,7 +482,7 @@ __global__ void ccn_multirow_multiright_shuffle(
 
 
     RES* res = shared_memory_proxy<RES>();
-    for (dsize_t i = ctb.thread_rank(); i < max_right_rows * right_matrices_per_thread * ctb.size(); i += ctb.size()) {
+    for (dsize_t i = ctb.thread_rank(); i < MAX_RIGHT_ROWS_PER_THREAD * MAX_RIGHT_MATRICES_PER_THREAD * ctb.size(); i += ctb.size()) {
         res[i] = 0;
     }
     ctb.sync();
@@ -494,7 +492,7 @@ __global__ void ccn_multirow_multiright_shuffle(
     // so to get the number of shifts with both sides inclusive, we need to add 1
     auto warp_num_right_rows = static_cast<dsize_t>(max(warp_max_shift.y - warp_min_shift.y + 1, 0));
 
-    dsize_t warp_num_right_matrices = min(num_right_matrices - matrix_group_start_idx, right_matrices_per_thread);
+    dsize_t warp_num_right_matrices = min(num_right_matrices - matrix_group_start_idx, MAX_RIGHT_MATRICES_PER_THREAD);
 
 
     auto args = create_warp_shuffle_impl_args(
@@ -510,7 +508,7 @@ __global__ void ccn_multirow_multiright_shuffle(
         search_size
     );
 
-    multirow_multiright_shuffle_impl_rows_dispatch<max_num_right_rows, max_num_right_mats, false>(
+    multirow_multiright_shuffle_impl_rows_dispatch<MAX_RIGHT_ROWS_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD, false>(
         ctb,
         warp,
         warp_num_right_rows,
@@ -518,6 +516,123 @@ __global__ void ccn_multirow_multiright_shuffle(
         args,
         res
     );
+}
+
+template<dsize_t MAX_RIGHT_ROWS_PER_THREAD, dsize_t MAX_RIGHT_MATRICES_PER_THREAD, typename T, typename RES>
+__host__ void ccn_multirow_multiright_shuffle_mat_disptach(
+    const T* __restrict__ left,
+    const T* __restrict__ right,
+    RES* __restrict__ out,
+    dsize2_t matrix_size,
+    dsize2_t search_size,
+    dsize_t num_right_matrices,
+    dsize_t cuda_rows_per_block,
+    dsize_t right_matrices_per_thread
+) {
+    if constexpr(MAX_RIGHT_MATRICES_PER_THREAD > 0) {
+        if (MAX_RIGHT_MATRICES_PER_THREAD == right_matrices_per_thread) {
+            dim3 num_threads(warp_size, cuda_rows_per_block);
+
+            dsize_t num_matrix_groups = div_up(num_right_matrices, MAX_RIGHT_MATRICES_PER_THREAD);
+            dsize_t blocks_per_matrix_group = div_up(search_size.x, num_threads.x);
+
+            dim3 num_blocks(
+                blocks_per_matrix_group * num_matrix_groups,
+                div_up(search_size.y, num_threads.y * MAX_RIGHT_ROWS_PER_THREAD)
+            );
+
+            dsize_t block_size = num_threads.x * num_threads.y;
+
+            dsize_t shared_mem_size = block_size * MAX_RIGHT_ROWS_PER_THREAD * MAX_RIGHT_MATRICES_PER_THREAD * sizeof(RES);
+
+            ccn_multirow_multiright_shuffle<MAX_RIGHT_ROWS_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD><<<num_blocks, num_threads, shared_mem_size>>>(
+                left,
+                right,
+                out,
+                matrix_size,
+                search_size,
+                num_right_matrices
+            );
+        } else {
+            ccn_multirow_multiright_shuffle_mat_disptach<MAX_RIGHT_ROWS_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD - 1>(
+                left,
+                right,
+                out,
+                matrix_size,
+                search_size,
+                num_right_matrices,
+                cuda_rows_per_block,
+                right_matrices_per_thread
+            );
+        }
+    } else {
+        // TODO: Solve the -Wunused-but-set-parameter warning
+        // Silence the confusing -Wunused-but-set-parameter warning
+        // as we are not setting the parameters anywhere
+        (void)left;
+        (void)right;
+        (void)out;
+        (void)matrix_size;
+        (void)search_size;
+        (void)num_right_matrices;
+        (void)cuda_rows_per_block;
+        (void)right_matrices_per_thread;
+        assert(false);
+    }
+}
+
+template<dsize_t MAX_RIGHT_ROWS_PER_THREAD, dsize_t MAX_RIGHT_MATRICES_PER_THREAD, typename T, typename RES>
+__host__ void ccn_multirow_multiright_shuffle_rows_disptach(
+    const T* __restrict__ left,
+    const T* __restrict__ right,
+    RES* __restrict__ out,
+    dsize2_t matrix_size,
+    dsize2_t search_size,
+    dsize_t num_right_matrices,
+    dsize_t cuda_rows_per_block,
+    dsize_t right_rows_per_thread,
+    dsize_t right_matrices_per_thread
+) {
+    if constexpr(MAX_RIGHT_ROWS_PER_THREAD > 0) {
+        if (MAX_RIGHT_ROWS_PER_THREAD == right_rows_per_thread) {
+            ccn_multirow_multiright_shuffle_mat_disptach<MAX_RIGHT_ROWS_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD>(
+                left,
+                right,
+                out,
+                matrix_size,
+                search_size,
+                num_right_matrices,
+                cuda_rows_per_block,
+                right_matrices_per_thread
+            );
+        } else {
+            ccn_multirow_multiright_shuffle_rows_disptach<MAX_RIGHT_ROWS_PER_THREAD - 1, MAX_RIGHT_MATRICES_PER_THREAD>(
+                left,
+                right,
+                out,
+                matrix_size,
+                search_size,
+                num_right_matrices,
+                cuda_rows_per_block,
+                right_rows_per_thread,
+                right_matrices_per_thread
+            );
+        }
+    } else {
+        // TODO: Solve the -Wunused-but-set-parameter warning
+        // Silence the confusing -Wunused-but-set-parameter warning
+        // as we are not setting the parameters anywhere
+        (void)left;
+        (void)right;
+        (void)out;
+        (void)matrix_size;
+        (void)search_size;
+        (void)num_right_matrices;
+        (void)cuda_rows_per_block;
+        (void)right_rows_per_thread;
+        (void)right_matrices_per_thread;
+        assert(false);
+    }
 }
 
 } // END anonymous namespace
@@ -531,44 +646,40 @@ void run_ccn_multirow_multiright_shuffle(
     dsize2_t search_size,
     dsize_t num_right_matrices,
     dsize_t cuda_rows_per_block,
-    dsize_t max_right_rows,
+    dsize_t right_rows_per_thread,
     dsize_t right_matrices_per_thread
 ) {
     if (cuda_rows_per_block > 32) {
         throw std::runtime_error("Too many rows per block: "s + std::to_string(cuda_rows_per_block) + " (max 32)");
     }
 
-    if (right_matrices_per_thread == 0 || right_matrices_per_thread > max_num_right_mats) {
-        throw std::runtime_error("Invalid number of right matrices per thread: "s +
+    if (right_rows_per_thread == 0 || right_rows_per_thread > right_rows_limit) {
+        throw std::runtime_error("Invalid number of right rows per thread: "s +
                                  std::to_string(right_matrices_per_thread) +
                                  " [1-"s +
-                                 std::to_string(max_num_right_mats) +
+                                 std::to_string(right_rows_limit) +
                                  "]"s
         );
     }
 
-    dim3 num_threads(warp_size, cuda_rows_per_block);
+    if (right_matrices_per_thread == 0 || right_matrices_per_thread > right_mats_limit) {
+        throw std::runtime_error("Invalid number of right matrices per thread: "s +
+                                 std::to_string(right_matrices_per_thread) +
+                                 " [1-"s +
+                                 std::to_string(right_mats_limit) +
+                                 "]"s
+        );
+    }
 
-    dsize_t num_matrix_groups = div_up(num_right_matrices, right_matrices_per_thread);
-    dsize_t blocks_per_matrix_group = div_up(search_size.x, num_threads.x);
-
-    dim3 num_blocks(
-        blocks_per_matrix_group * num_matrix_groups,
-        div_up(search_size.y, num_threads.y * max_right_rows)
-    );
-
-    dsize_t block_size = num_threads.x * num_threads.y;
-
-    dsize_t shared_mem_size = block_size * max_right_rows * right_matrices_per_thread * sizeof(RES);
-
-    ccn_multirow_multiright_shuffle<<<num_blocks, num_threads, shared_mem_size>>>(
+    ccn_multirow_multiright_shuffle_rows_disptach<right_rows_limit, right_mats_limit>(
         left,
         right,
         out,
         matrix_size,
         search_size,
         num_right_matrices,
-        max_right_rows,
+        cuda_rows_per_block,
+        right_rows_per_thread,
         right_matrices_per_thread
     );
 }
@@ -581,7 +692,7 @@ template void run_ccn_multirow_multiright_shuffle<int, int>(
     dsize2_t search_size,
     dsize_t num_right_matrices,
     dsize_t cuda_rows_per_block,
-    dsize_t max_right_rows,
+    dsize_t right_rows_per_thread,
     dsize_t right_matrices_per_thread
 );
 
@@ -593,7 +704,7 @@ template void run_ccn_multirow_multiright_shuffle<float, float>(
     dsize2_t search_size,
     dsize_t num_right_matrices,
     dsize_t cuda_rows_per_block,
-    dsize_t max_right_rows,
+    dsize_t right_rows_per_thread,
     dsize_t right_matrices_per_thread
 );
 
@@ -605,7 +716,7 @@ template void run_ccn_multirow_multiright_shuffle<double, double>(
     dsize2_t search_size,
     dsize_t num_right_matrices,
     dsize_t cuda_rows_per_block,
-    dsize_t max_right_rows,
+    dsize_t right_rows_per_thread,
     dsize_t right_matrices_per_thread
 );
 

@@ -22,10 +22,10 @@ namespace cross {
 
 namespace {
 
-constexpr dsize_t shifts_per_thread_per_right_matrix_limit = 2;
-constexpr dsize_t right_matrices_per_thread_limit = 2;
-constexpr dsize_t left_matrices_per_thread_limit = 2;
-constexpr dsize_t left_rows_per_iteration_limit = 2;
+constexpr dsize_t shifts_per_thread_per_right_matrix_limit = SHUFFLE_N_TO_M_MULTIROW_SHIFTS_PER_THREAD_PER_RIGHT_MATRIX_LIMIT;
+constexpr dsize_t right_matrices_per_thread_limit = SHUFFLE_N_TO_M_MULTIROW_RIGHT_MATRICES_PER_THREAD_LIMIT;
+constexpr dsize_t left_matrices_per_thread_limit = SHUFFLE_N_TO_M_MULTIROW_LEFT_MATRICES_PER_THREAD_LIMIT;
+constexpr dsize_t left_rows_per_iteration_limit = SHUFFLE_N_TO_M_MULTIROW_LEFT_ROWS_PER_ITERATION_LIMIT;
 
 /**
  * Arguments for the warp_shuffle_impl function.
