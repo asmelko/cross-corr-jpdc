@@ -16,7 +16,7 @@ namespace cross {
 namespace {
 
 template<typename T, typename RES>
-__global__ void ccn_shift_per_block(
+__global__ void ccn_block_per_shift(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -100,7 +100,7 @@ __global__ void ccn_shift_per_block(
 } // END anonymous namespace
 
 template<typename T, typename RES>
-void run_ccn_shift_per_block(
+void run_ccn_block_per_shift(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -120,7 +120,7 @@ void run_ccn_shift_per_block(
 
     // One item for each wapr in a block
     dsize_t shared_mem_size = (cuda_block_size / warp_size) * sizeof(RES);
-    ccn_shift_per_block<<<num_blocks, num_threads, shared_mem_size>>>(
+    ccn_block_per_shift<<<num_blocks, num_threads, shared_mem_size>>>(
         left,
         right,
         out,
@@ -129,7 +129,7 @@ void run_ccn_shift_per_block(
     );
 }
 
-template void run_ccn_shift_per_block<int, int>(
+template void run_ccn_block_per_shift<int, int>(
     const int* __restrict__ left,
     const int* __restrict__ right,
     int* __restrict__ out,
@@ -138,7 +138,7 @@ template void run_ccn_shift_per_block<int, int>(
     dsize_t cuda_block_size
 );
 
-template void run_ccn_shift_per_block<float, float>(
+template void run_ccn_block_per_shift<float, float>(
     const float* __restrict__ left,
     const float* __restrict__ right,
     float* __restrict__ out,
@@ -147,7 +147,7 @@ template void run_ccn_shift_per_block<float, float>(
     dsize_t cuda_block_size
 );
 
-template void run_ccn_shift_per_block<double, double>(
+template void run_ccn_block_per_shift<double, double>(
     const double* __restrict__ left,
     const double* __restrict__ right,
     double* __restrict__ out,

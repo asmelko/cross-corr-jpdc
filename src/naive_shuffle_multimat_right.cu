@@ -19,7 +19,7 @@ namespace cross {
 
 namespace {
 
-constexpr dsize_t right_matrices_per_thread_limit = SHUFFLE_RIGHT_MATRICES_PER_THREAD_LIMIT;
+constexpr dsize_t right_matrices_per_thread_limit = SHUFFLE_MULTIMAT_RIGHT_RIGHT_MATRICES_PER_THREAD_LIMIT;
 
 __device__ void get_matrix_group(
     dsize_t output_size,
@@ -230,7 +230,7 @@ __device__ void warp_shuffle_impl_right_mats_dispatch(
  * and then always loads 32 values
  */
 template<dsize_t MAX_RIGHT_MATRICES_PER_THREAD, typename T, typename RES>
-__global__ void ccn_warp_shuffle(
+__global__ void ccn_shuffle_multimat_right(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -347,7 +347,7 @@ __global__ void ccn_warp_shuffle(
 }
 
 template<dsize_t MAX_RIGHT_MATRICES_PER_THREAD, typename T, typename RES>
-__host__ void ccn_warp_shuffle_right_mats_dispatch(
+__host__ void ccn_shuffle_multimat_right_right_mats_dispatch(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -380,7 +380,7 @@ __host__ void ccn_warp_shuffle_right_mats_dispatch(
                 div_up(search_size.y, num_threads.y)
             );
 
-            ccn_warp_shuffle<MAX_RIGHT_MATRICES_PER_THREAD><<<num_blocks, num_threads>>>(
+            ccn_shuffle_multimat_right<MAX_RIGHT_MATRICES_PER_THREAD><<<num_blocks, num_threads>>>(
                 left,
                 right,
                 out,
@@ -389,7 +389,7 @@ __host__ void ccn_warp_shuffle_right_mats_dispatch(
                 num_right_matrices
             );
         } else {
-            ccn_warp_shuffle_right_mats_dispatch<MAX_RIGHT_MATRICES_PER_THREAD - 1>(
+            ccn_shuffle_multimat_right_right_mats_dispatch<MAX_RIGHT_MATRICES_PER_THREAD - 1>(
                 left,
                 right,
                 out,
@@ -404,7 +404,7 @@ __host__ void ccn_warp_shuffle_right_mats_dispatch(
 }
 
 /**
- * For description of the functionality implemented by this kernel, see ccn_warp_shuffle kernel.
+ * For description of the functionality implemented by this kernel, see ccn_shuffle_multimat_right kernel.
  * This kernel adds distribution of rows of a single shift between multiple threads.
  *
  * @tparam T
@@ -416,7 +416,7 @@ __host__ void ccn_warp_shuffle_right_mats_dispatch(
  * @param search_size
  */
 template<dsize_t MAX_RIGHT_MATRICES_PER_THREAD, typename DIST, typename T, typename RES>
-__global__ void ccn_warp_shuffle_work_distribution(
+__global__ void ccn_shuffle_multimat_right_work_distribution(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -541,7 +541,7 @@ __global__ void ccn_warp_shuffle_work_distribution(
 }
 
 template<dsize_t MAX_RIGHT_MATRICES_PER_THREAD, typename DIST, typename T, typename RES>
-__host__ void ccn_warp_shuffle_work_distribution_right_mats_dispatch(
+__host__ void ccn_shuffle_multimat_right_work_distribution_right_mats_dispatch(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -581,7 +581,7 @@ __host__ void ccn_warp_shuffle_work_distribution_right_mats_dispatch(
                 div_up(num_workers, num_threads.y)
             );
 
-            ccn_warp_shuffle_work_distribution<MAX_RIGHT_MATRICES_PER_THREAD, DIST><<<num_blocks, num_threads, 0, cuda_stream>>>(
+            ccn_shuffle_multimat_right_work_distribution<MAX_RIGHT_MATRICES_PER_THREAD, DIST><<<num_blocks, num_threads, 0, cuda_stream>>>(
                 left,
                 right,
                 out,
@@ -591,7 +591,7 @@ __host__ void ccn_warp_shuffle_work_distribution_right_mats_dispatch(
                 max_rows_per_thread
             );
         } else {
-            ccn_warp_shuffle_work_distribution_right_mats_dispatch<MAX_RIGHT_MATRICES_PER_THREAD - 1, DIST>(
+            ccn_shuffle_multimat_right_work_distribution_right_mats_dispatch<MAX_RIGHT_MATRICES_PER_THREAD - 1, DIST>(
                 left,
                 right,
                 out,
@@ -610,7 +610,7 @@ __host__ void ccn_warp_shuffle_work_distribution_right_mats_dispatch(
 } // END anonymous namespace
 
 template<typename T, typename RES>
-void run_ccn_warp_shuffle(
+void run_ccn_shuffle_multimat_right(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -634,7 +634,7 @@ void run_ccn_warp_shuffle(
         );
     }
 
-    ccn_warp_shuffle_right_mats_dispatch<right_matrices_per_thread_limit>(
+    ccn_shuffle_multimat_right_right_mats_dispatch<right_matrices_per_thread_limit>(
         left,
         right,
         out,
@@ -647,7 +647,7 @@ void run_ccn_warp_shuffle(
 }
 
 template<typename DIST, typename T, typename RES>
-void run_ccn_warp_shuffle_work_distribution(
+void run_ccn_shuffle_multimat_right_work_distribution(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -672,7 +672,7 @@ void run_ccn_warp_shuffle_work_distribution(
         );
     }
 
-    ccn_warp_shuffle_work_distribution_right_mats_dispatch<right_matrices_per_thread_limit, DIST>(
+    ccn_shuffle_multimat_right_work_distribution_right_mats_dispatch<right_matrices_per_thread_limit, DIST>(
         left,
         right,
         out,
@@ -686,7 +686,7 @@ void run_ccn_warp_shuffle_work_distribution(
     );
 }
 
-template void run_ccn_warp_shuffle<int, int>(
+template void run_ccn_shuffle_multimat_right<int, int>(
         const int* __restrict__ left,
         const int* __restrict__ right,
         int* __restrict__ out,
@@ -697,7 +697,7 @@ template void run_ccn_warp_shuffle<int, int>(
         dsize_t right_matrices_per_thread
 );
 
-template void run_ccn_warp_shuffle<float, float>(
+template void run_ccn_shuffle_multimat_right<float, float>(
         const float* __restrict__ left,
         const float* __restrict__ right,
         float* __restrict__ out,
@@ -708,7 +708,7 @@ template void run_ccn_warp_shuffle<float, float>(
         dsize_t right_matrices_per_thread
 );
 
-template void run_ccn_warp_shuffle<double, double>(
+template void run_ccn_shuffle_multimat_right<double, double>(
         const double* __restrict__ left,
         const double* __restrict__ right,
         double* __restrict__ out,
@@ -719,7 +719,7 @@ template void run_ccn_warp_shuffle<double, double>(
         dsize_t right_matrices_per_thread
 );
 
-template void run_ccn_warp_shuffle_work_distribution<triangle_distribution, int, int>(
+template void run_ccn_shuffle_multimat_right_work_distribution<triangle_distribution, int, int>(
     const int* __restrict__ left,
     const int* __restrict__ right,
     int* __restrict__ out,
@@ -732,7 +732,7 @@ template void run_ccn_warp_shuffle_work_distribution<triangle_distribution, int,
     cudaStream_t cuda_stream
 );
 
-template void run_ccn_warp_shuffle_work_distribution<triangle_distribution, float, float>(
+template void run_ccn_shuffle_multimat_right_work_distribution<triangle_distribution, float, float>(
     const float* __restrict__ left,
     const float* __restrict__ right,
     float* __restrict__ out,
@@ -745,7 +745,7 @@ template void run_ccn_warp_shuffle_work_distribution<triangle_distribution, floa
     cudaStream_t cuda_stream
 );
 
-template void run_ccn_warp_shuffle_work_distribution<triangle_distribution, double, double>(
+template void run_ccn_shuffle_multimat_right_work_distribution<triangle_distribution, double, double>(
     const double* __restrict__ left,
     const double* __restrict__ right,
     double* __restrict__ out,
@@ -758,7 +758,7 @@ template void run_ccn_warp_shuffle_work_distribution<triangle_distribution, doub
     cudaStream_t cuda_stream
 );
 
-template void run_ccn_warp_shuffle_work_distribution<rectangle_distribution, int, int>(
+template void run_ccn_shuffle_multimat_right_work_distribution<rectangle_distribution, int, int>(
     const int* __restrict__ left,
     const int* __restrict__ right,
     int* __restrict__ out,
@@ -771,7 +771,7 @@ template void run_ccn_warp_shuffle_work_distribution<rectangle_distribution, int
     cudaStream_t cuda_stream
 );
 
-template void run_ccn_warp_shuffle_work_distribution<rectangle_distribution, float, float>(
+template void run_ccn_shuffle_multimat_right_work_distribution<rectangle_distribution, float, float>(
     const float* __restrict__ left,
     const float* __restrict__ right,
     float* __restrict__ out,
@@ -784,7 +784,7 @@ template void run_ccn_warp_shuffle_work_distribution<rectangle_distribution, flo
     cudaStream_t cuda_stream
 );
 
-template void run_ccn_warp_shuffle_work_distribution<rectangle_distribution, double, double>(
+template void run_ccn_shuffle_multimat_right_work_distribution<rectangle_distribution, double, double>(
     const double* __restrict__ left,
     const double* __restrict__ right,
     double* __restrict__ out,
@@ -797,7 +797,7 @@ template void run_ccn_warp_shuffle_work_distribution<rectangle_distribution, dou
     cudaStream_t cuda_stream
 );
 
-template void run_ccn_warp_shuffle_work_distribution<no_distribution, int, int>(
+template void run_ccn_shuffle_multimat_right_work_distribution<no_distribution, int, int>(
     const int* __restrict__ left,
     const int* __restrict__ right,
     int* __restrict__ out,
@@ -810,7 +810,7 @@ template void run_ccn_warp_shuffle_work_distribution<no_distribution, int, int>(
     cudaStream_t cuda_stream
 );
 
-template void run_ccn_warp_shuffle_work_distribution<no_distribution, float, float>(
+template void run_ccn_shuffle_multimat_right_work_distribution<no_distribution, float, float>(
     const float* __restrict__ left,
     const float* __restrict__ right,
     float* __restrict__ out,
@@ -823,7 +823,7 @@ template void run_ccn_warp_shuffle_work_distribution<no_distribution, float, flo
     cudaStream_t cuda_stream
 );
 
-template void run_ccn_warp_shuffle_work_distribution<no_distribution, double, double>(
+template void run_ccn_shuffle_multimat_right_work_distribution<no_distribution, double, double>(
     const double* __restrict__ left,
     const double* __restrict__ right,
     double* __restrict__ out,

@@ -377,7 +377,7 @@ __device__ void shared_mem_rows_impl_dispatch(
  * with warps in the same block computed shifts with the same y axis does not lead
  * to bank conflicts.
  *
- * TODO: This does not work with shared_mem_rows < shift_per_block
+ * TODO: This does not work with shared_mem_rows < shifts_per_block
  * @tparam T
  * @tparam RES
  * @param left

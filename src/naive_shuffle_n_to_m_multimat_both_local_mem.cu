@@ -14,12 +14,12 @@
 
 namespace cg = cooperative_groups;
 
-namespace cross::orig {
+namespace cross::local_mem {
 
 namespace {
 
-constexpr dsize_t left_matrices_per_thread_limit = SHUFFLE_N_TO_M_MULTIMAT_BOTH_ORIG_LEFT_MATRICES_PER_THREAD_LIMIT;
-constexpr dsize_t right_matrices_per_thread_limit = SHUFFLE_N_TO_M_MULTIMAT_BOTH_ORIG_RIGHT_MATRICES_PER_THREAD_LIMIT;
+constexpr dsize_t left_matrices_per_thread_limit = SHUFFLE_N_TO_M_MULTIMAT_BOTH_LOCAL_MEM_LEFT_MATRICES_PER_THREAD_LIMIT;
+constexpr dsize_t right_matrices_per_thread_limit = SHUFFLE_N_TO_M_MULTIMAT_BOTH_LOCAL_MEM_RIGHT_MATRICES_PER_THREAD_LIMIT;
 
 /**
  * Arguments for the warp_shuffle_impl function.

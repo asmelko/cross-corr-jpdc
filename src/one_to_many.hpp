@@ -176,9 +176,9 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class naive_warp_shuffle_one_to_many: public naive_gpu_one_to_many<T, BENCH_TYPE, ALLOC> {
+class naive_shuffle_multimat_right_one_to_many: public naive_gpu_one_to_many<T, BENCH_TYPE, ALLOC> {
 public:
-    explicit naive_warp_shuffle_one_to_many(const json& args, std::chrono::nanoseconds min_measured_time)
+    explicit naive_shuffle_multimat_right_one_to_many(const json& args, std::chrono::nanoseconds min_measured_time)
         :naive_gpu_one_to_many<T, BENCH_TYPE, ALLOC>(std::size(labels), min_measured_time)
     {
         warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
@@ -194,7 +194,7 @@ public:
 protected:
     void run_impl() override {
         CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
-                     run_ccn_warp_shuffle(
+                     run_ccn_shuffle_multimat_right(
                          this->d_ref_,
                          this->d_targets_,
                          this->d_results_,
@@ -225,9 +225,9 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class naive_warp_shuffle_work_distribution_one_to_many: public naive_gpu_one_to_many<T, BENCH_TYPE, ALLOC> {
+class naive_shuffle_multimat_right_work_distribution_one_to_many: public naive_gpu_one_to_many<T, BENCH_TYPE, ALLOC> {
 public:
-    explicit naive_warp_shuffle_work_distribution_one_to_many(const json& args, std::chrono::nanoseconds min_measured_time)
+    explicit naive_shuffle_multimat_right_work_distribution_one_to_many(const json& args, std::chrono::nanoseconds min_measured_time)
         :naive_gpu_one_to_many<T, BENCH_TYPE, ALLOC>(std::size(labels), min_measured_time)
     {
         warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
@@ -288,7 +288,7 @@ private:
             // Need to zero out as work distribution uses atomicAdd on the results matrix
             cuda_memset(this->d_results_, 0, this->results_.size());
 
-            run_ccn_warp_shuffle_work_distribution<DISTRIBUTION>(
+            run_ccn_shuffle_multimat_right_work_distribution<DISTRIBUTION>(
                 this->d_ref_,
                 this->d_targets_,
                 this->d_results_,

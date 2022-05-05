@@ -63,7 +63,7 @@ void run_scatter(
 );
 
 template<typename T, typename RES>
-void run_ccn_warp_shuffle(
+void run_ccn_shuffle_multimat_right(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -106,7 +106,7 @@ void run_ccn_warp_per_shift_work_distribution(
 );
 
 template<typename DIST, typename T, typename RES>
-void run_ccn_warp_shuffle_work_distribution(
+void run_ccn_shuffle_multimat_right_work_distribution(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -174,7 +174,7 @@ void run_ccn_shuffle_multirow_both(
 );
 
 template<typename T, typename RES>
-void run_ccn_shift_per_block(
+void run_ccn_block_per_shift(
     const T* __restrict__ left,
     const T* __restrict__ right,
     RES* __restrict__ out,
@@ -226,7 +226,7 @@ void run_ccn_n_to_m_shuffle_multirow_both_multimat_both(
     dsize_t left_rows_per_iteration
 );
 
-namespace orig {
+namespace local_mem {
 
 template<typename DIST, typename T, typename RES>
 void run_ccn_shuffle_n_to_m_multimat_both_work_distribution(

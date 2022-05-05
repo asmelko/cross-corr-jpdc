@@ -201,9 +201,9 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class naive_warp_shuffle_work_distribution_n_to_m: public naive_gpu_n_to_m<T, BENCH_TYPE, ALLOC> {
+class naive_shuffle_multimat_right_work_distribution_n_to_m: public naive_gpu_n_to_m<T, BENCH_TYPE, ALLOC> {
 public:
-    explicit naive_warp_shuffle_work_distribution_n_to_m([[maybe_unused]] const json& args, std::chrono::nanoseconds min_measured_time)
+    explicit naive_shuffle_multimat_right_work_distribution_n_to_m([[maybe_unused]] const json& args, std::chrono::nanoseconds min_measured_time)
         :naive_gpu_n_to_m<T, BENCH_TYPE, ALLOC>(0, min_measured_time),
             cuda_streams_()
     {
@@ -272,7 +272,7 @@ private:
         cuda_memset(this->d_results_, 0, this->results_.size());
 
         for (dsize_t ref = 0; ref < this->refs_.num_matrices(); ++ref) {
-            run_ccn_warp_shuffle_work_distribution<DISTRIBUTION>(
+            run_ccn_shuffle_multimat_right_work_distribution<DISTRIBUTION>(
                 this->d_refs_ + ref * this->refs_.matrix_size().area(),
                 this->d_targets_,
                 this->d_results_ + (ref * this->targets_.num_matrices()) * this->results_.matrix_size().area(),
@@ -366,9 +366,9 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class naive_shuffle_multimat_both_work_distribution_n_to_m_orig: public naive_gpu_n_to_m<T, BENCH_TYPE, ALLOC> {
+class naive_shuffle_multimat_both_work_distribution_local_mem_n_to_m: public naive_gpu_n_to_m<T, BENCH_TYPE, ALLOC> {
 public:
-    explicit naive_shuffle_multimat_both_work_distribution_n_to_m_orig(const json& args, std::chrono::nanoseconds min_measured_time)
+    explicit naive_shuffle_multimat_both_work_distribution_local_mem_n_to_m(const json& args, std::chrono::nanoseconds min_measured_time)
         :naive_gpu_n_to_m<T, BENCH_TYPE, ALLOC>(std::size(labels), min_measured_time)
     {
         warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
@@ -425,7 +425,7 @@ private:
     template<typename DISTRIBUTION>
     void start_kernel() {
         CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
-            orig::run_ccn_shuffle_n_to_m_multimat_both_work_distribution<DISTRIBUTION>(
+            local_mem::run_ccn_shuffle_n_to_m_multimat_both_work_distribution<DISTRIBUTION>(
                 this->d_refs_,
                 this->d_targets_,
                 this->d_results_,

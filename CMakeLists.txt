@@ -14,15 +14,15 @@ endif()
 
 # List in format <option_name>:<release value>:<debug value>:<description>
 set(ALG_LIMIT_OPTIONS
-        "SHUFFLE_RIGHT_MATRICES_PER_THREAD_LIMIT:8:4:Maximum value of num_right_rows to generate code for"
+        "SHUFFLE_MULTIMAT_RIGHT_RIGHT_MATRICES_PER_THREAD_LIMIT:8:4:Maximum value of num_right_rows to generate code for"
 
         "SHUFFLE_MULTIROW_RIGHT_RIGHT_ROWS_LIMIT:8:4:Maximum value of right_rows to generate code for"
 
         "SHUFFLE_MULTIROW_BOTH_SHIFTS_PER_THREAD_LIMIT:8:4:Maximum value of shifts_per_thread to generate code for"
         "SHUFFLE_MULTIROW_BOTH_LEFT_ROWS_LIMIT:4:2:Maximum value of left_rows to generate code for"
 
-        "SHUFFLE_MULTIROW_BOTH_ORIG_SHIFTS_PER_THREAD_LIMIT:8:4:Maximum value of shifts_per_thread to generate code for"
-        "SHUFFLE_MULTIROW_BOTH_ORIG_LEFT_ROWS_LIMIT:4:2:Maximum value of left_rows to generate code for"
+        "SHUFFLE_MULTIROW_BOTH_LOCAL_MEM_SHIFTS_PER_THREAD_LIMIT:8:4:Maximum value of shifts_per_thread to generate code for"
+        "SHUFFLE_MULTIROW_BOTH_LOCAL_MEM_LEFT_ROWS_LIMIT:4:2:Maximum value of left_rows to generate code for"
 
         "SHUFFLE_MULTIROW_RIGHT_MULTIMAT_RIGHT_RIGHT_ROWS_LIMIT:4:2:Maximum value of right_rows to generate code for"
         "SHUFFLE_MULTIROW_RIGHT_MULTIMAT_RIGHT_RIGHT_MATS_LIMIT:4:2:Maximum value of right_mats to generate code for"
@@ -30,8 +30,8 @@ set(ALG_LIMIT_OPTIONS
         "SHUFFLE_N_TO_M_MULTIMAT_BOTH_LEFT_MATRICES_PER_THREAD_LIMIT:4:2:Maximum value of left_matrices_per_thread to generate code for"
         "SHUFFLE_N_TO_M_MULTIMAT_BOTH_RIGHT_MATRICES_PER_THREAD_LIMIT:4:2:Maximum value of right_matrices_per_thread to generate code for"
 
-        "SHUFFLE_N_TO_M_MULTIMAT_BOTH_ORIG_LEFT_MATRICES_PER_THREAD_LIMIT:4:2:Maximum value of left_matrices_per_thread to generate code for"
-        "SHUFFLE_N_TO_M_MULTIMAT_BOTH_ORIG_RIGHT_MATRICES_PER_THREAD_LIMIT:4:2:Maximum value of right_matrices_per_thread to generate code for"
+        "SHUFFLE_N_TO_M_MULTIMAT_BOTH_LOCAL_MEM_LEFT_MATRICES_PER_THREAD_LIMIT:4:2:Maximum value of left_matrices_per_thread to generate code for"
+        "SHUFFLE_N_TO_M_MULTIMAT_BOTH_LOCAL_MEM_RIGHT_MATRICES_PER_THREAD_LIMIT:4:2:Maximum value of right_matrices_per_thread to generate code for"
 
         "SHUFFLE_N_TO_M_MULTIROW_BOTH_MULTIMAT_BOTH_SHIFTS_PER_THREAD_PER_RIGHT_MATRIX_LIMIT:4:2:Maximum value of shifts_per_thread_per_right_matrix to generate code for"
         "SHUFFLE_N_TO_M_MULTIROW_BOTH_MULTIMAT_BOTH_RIGHT_MATRICES_PER_THREAD_LIMIT:4:2:Maximum value of right_matrices_per_thread to generate code for"
@@ -135,7 +135,7 @@ set_source_files_properties(${CPP_SOURCES} PROPERTIES LANGUAGE CUDA)
 set(CUDA_SOURCES
         ${CMAKE_SOURCE_DIR}/src/hadamard.cu
         ${CMAKE_SOURCE_DIR}/src/naive_original.cu
-        ${CMAKE_SOURCE_DIR}/src/naive_shuffle.cu
+        ${CMAKE_SOURCE_DIR}/src/naive_shuffle_multimat_right.cu
         ${CMAKE_SOURCE_DIR}/src/naive_shuffle_n_to_m_multimat_both.cu
         ${CMAKE_SOURCE_DIR}/src/naive_shuffle_n_to_m_multirow_both_multimat_both.cu
         ${CMAKE_SOURCE_DIR}/src/naive_shuffle_multirow_right.cu
@@ -146,8 +146,8 @@ set(CUDA_SOURCES
         ${CMAKE_SOURCE_DIR}/src/naive_warp_per_shift_shared_mem.cu
         ${CMAKE_SOURCE_DIR}/src/naive_block_per_shift.cu
         ${CMAKE_SOURCE_DIR}/src/scatter.cu
-        ${CMAKE_SOURCE_DIR}/src/naive_shuffle_n_to_m_multimat_both_orig.cu
-        ${CMAKE_SOURCE_DIR}/src/naive_shuffle_multirow_both_orig.cu
+        ${CMAKE_SOURCE_DIR}/src/naive_shuffle_n_to_m_multimat_both_local_mem.cu
+        ${CMAKE_SOURCE_DIR}/src/naive_shuffle_multirow_both_local_mem.cu
 
 )
 
