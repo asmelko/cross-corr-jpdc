@@ -26,7 +26,7 @@ public:
 
     template<typename IT>
     static void pad_row([[maybe_unused]] IT begin,[[maybe_unused]] IT end) {
-        return;
+        // Nothing
     }
 };
 
@@ -248,6 +248,8 @@ public:
         inline bool operator>(const iter& rhs) const {
             return pos_.y > rhs.pos_.y || (pos_.y == rhs.pos_.y && pos_.x > rhs.pos_.x);
         }
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "Simplify"
         inline bool operator<(const iter& rhs) const {
             return !(*this > rhs) && !(*this == rhs);
         }
@@ -257,6 +259,7 @@ public:
         inline bool operator<=(const iter& rhs) const {
             return !(*this > rhs);
         }
+#pragma clang diagnostic pop
     private:
         static inline dsize2_t shift_pos(dsize2_t pos, difference_type shift, dsize_t row_size) {
             auto x = (difference_type)pos.x + shift;
@@ -287,11 +290,11 @@ public:
         :top_left_(top_left), size_(size), src_row_size_(src_row_size), src_data_(src_data)
     { }
 
-    dsize2_t size() const {
+    [[nodiscard]] dsize2_t size() const {
         return size_;
     }
 
-    dsize_t area() const {
+    [[nodiscard]] dsize_t area() const {
         return size_.area();
     }
 
@@ -421,7 +424,7 @@ public:
         :data_array<T, ALLOC>(dsize2_t{0,0}, 0)
     { }
 
-    data_array(dsize2_t matrix_size, dsize_t num_matrices = 1)
+    explicit data_array(dsize2_t matrix_size, dsize_t num_matrices = 1)
         :num_matrices_(num_matrices), matrix_size_(matrix_size), data_(matrix_size.area() * num_matrices)
     { }
 
@@ -494,15 +497,15 @@ public:
         }
     }
 
-    size_type size() const {
+    [[nodiscard]] size_type size() const {
         return num_matrices_ * matrix_size_.area();
     }
 
-    size_type num_matrices() const {
+    [[nodiscard]] size_type num_matrices() const {
         return num_matrices_;
     }
 
-    dsize2_t matrix_size() const {
+    [[nodiscard]] dsize2_t matrix_size() const {
         return matrix_size_;
     }
 

@@ -1,8 +1,6 @@
-#include <cuda.h>
 #include <cuda_runtime.h>
 
 #include <cooperative_groups.h>
-#include <cooperative_groups/memcpy_async.h>
 #include <cooperative_groups/reduce.h>
 
 #include <cassert>
@@ -11,8 +9,6 @@
 #include "types.cuh"
 #include "cuda_helpers.cuh"
 #include "shared_mem.cuh"
-#include "row_distribution.cuh"
-#include "argument_error.hpp"
 #include "warp_size.hpp"
 
 namespace cg = cooperative_groups;
@@ -76,9 +72,9 @@ __device__ void compute_from_shared_mem_buffers(
     int buffer_offset = buffer_row_shift * static_cast<int>(row_size);
 
     for (
-        int right_idx = warp_right_start_offset + warp.thread_rank();
+        int right_idx = warp_right_start_offset + static_cast<int>(warp.thread_rank());
         right_idx < warp_right_end_offset;
-        right_idx += warp.size()
+        right_idx += static_cast<int>(warp.size())
     ) {
         auto l = left_buffer[right_idx + buffer_offset];
         for (dsize_t i = 0; i < NUM_RIGHT; ++i) {

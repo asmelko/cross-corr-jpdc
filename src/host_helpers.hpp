@@ -26,7 +26,7 @@ inline double from_string<double>(const std::string& in) {
 
 template<typename T>
 std::ostream& operator<<(std::ostream& out, const std::vector<T>& vec) {
-    std::string sep = "";
+    std::string sep;
     for(auto&& val: vec) {
         out << sep << val;
         sep = ", ";

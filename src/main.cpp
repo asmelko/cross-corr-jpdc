@@ -75,11 +75,11 @@ void validate(
     }
 }
 
-std::vector<std::string> with_iteration_labels(const std::vector<std::string>& labels) {
+std::vector<std::string> with_iteration_labels(const std::vector<const char*>& labels) {
     std::vector<std::string> out{labels.size() * 2};
     for (std::size_t i = 0; i < labels.size(); ++i) {
         out[2*i] = labels[i];
-        out[2*i + 1] = labels[i] + "_iterations";
+        out[2*i + 1] = std::string{labels[i]} + "_iterations";
     }
     return out;
 }
@@ -87,7 +87,7 @@ std::vector<std::string> with_iteration_labels(const std::vector<std::string>& l
 template<typename DURATION>
 void output_measurements(
     const std::filesystem::path& measurements_path,
-    const std::vector<std::string>& labels,
+    const std::vector<const char*>& labels,
     const std::vector<measurement_result<DURATION>>& measurements,
     const std::vector<std::pair<std::string, std::string>>& additional_properties,
     bool append
@@ -211,7 +211,7 @@ int run_measurement(
 ) {
     simple_logger logger{run_args.print_progress && ALG::benchmarking_type != BenchmarkType::Compute, run_args.append_measurements};
 
-    std::vector<std::string> compute_labels{"Computation"};
+    std::vector<const char*> compute_labels{"Computation"};
     stopwatch<std::chrono::high_resolution_clock> sw{compute_labels.size(), run_args.min_time};
 
     json alg_args;

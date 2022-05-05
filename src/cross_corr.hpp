@@ -25,7 +25,7 @@ template<typename T, typename PADDING, typename ALLOC = std::allocator<T>>
 std::tuple<data_array<T,ALLOC>, std::vector<dsize_t>> load_matrix_array_from_multiple_csv(const std::vector<std::filesystem::path>& paths) {
     std::vector<std::ifstream> inputs(paths.size());
     for (auto&& path: paths) {
-        inputs.push_back(std::ifstream{path});
+        inputs.emplace_back(path);
     }
     return data_array<T,ALLOC>::template load_from_csv<PADDING>(std::move(inputs));
 }
@@ -55,7 +55,7 @@ public:
     constexpr static BenchmarkType benchmarking_type = BENCH_TYPE;
 
     cross_corr_alg(bool is_fft, std::size_t num_measurements, std::chrono::nanoseconds min_measured_time)
-        :is_fft_(is_fft), sw_(measure_common() ? labels.size() : num_measurements, min_measured_time)
+        :is_fft_(is_fft), sw_(measure_common() ? std::size(labels) : num_measurements, min_measured_time)
     {}
 
     void load(const std::filesystem::path& ref_path, const std::filesystem::path& target_path) {
@@ -109,7 +109,7 @@ public:
     virtual const data_array<T, ALLOC>& results() const = 0;
 
 
-    validation_results validate(const std::optional<std::filesystem::path>& valid_data_path = std::nullopt) const {
+    [[nodiscard]] validation_results validate(const std::optional<std::filesystem::path>& valid_data_path = std::nullopt) const {
         auto valid = valid_results(valid_data_path);
         if (this->is_fft()) {
             return validate_result(normalize_fft_results(this->results()), valid);
@@ -119,19 +119,21 @@ public:
     }
 
 
-    std::vector<std::string> measurement_labels() const {
-        return measure_common() ? labels : measurement_labels_impl();
+    [[nodiscard]] std::vector<const char*> measurement_labels() const {
+        return measure_common() ?
+            std::vector<const char*>(std::begin(labels), std::end(labels)) :
+            measurement_labels_impl();
     };
 
-    bool is_fft() const {
+    [[nodiscard]] bool is_fft() const {
         return is_fft_;
     }
 
-    const std::vector<stopwatch<sw_clock>::result>& measurements() const {
+    [[nodiscard]] const std::vector<stopwatch<sw_clock>::result>& measurements() const {
         return sw_.results();
     }
 
-    virtual std::vector<std::pair<std::string, std::string>> additional_properties() const {
+    [[nodiscard]] virtual std::vector<std::pair<std::string, std::string>> additional_properties() const {
         return std::vector<std::pair<std::string, std::string>>{};
     }
 protected:
@@ -167,12 +169,19 @@ protected:
 
     virtual data_array<T> get_valid_results() const = 0;
 
-    virtual std::vector<std::string> measurement_labels_impl() const {
-        return std::vector<std::string>{};
+    [[nodiscard]] virtual std::vector<const char*> measurement_labels_impl() const {
+        return std::vector<const char*>{};
     }
 
 private:
-    static std::vector<std::string> labels;
+    inline static const char* labels[] = {
+        "Load",
+        "Prepare",
+        "Transfer",
+        "Run",
+        "Finalize",
+        "Free"
+    };
 
     static constexpr bool measure_common() {
         return BENCH_TYPE == BenchmarkType::CommonSteps;
@@ -185,16 +194,6 @@ private:
             return get_valid_results();
         }
     }
-};
-
-template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
-std::vector<std::string> cross_corr_alg<T, BENCH_TYPE, ALLOC>::labels{
-    "Load",
-    "Prepare",
-    "Transfer",
-    "Run",
-    "Finalize",
-    "Free"
 };
 
 }

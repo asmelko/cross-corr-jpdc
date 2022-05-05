@@ -31,35 +31,35 @@ public:
         :empty_(false), diff_max_(diff_max), diff_mean_(diff_mean), diff_std_dev_(diff_std_dev), max_valid_(max_valid), max_actual_(max_actual)
     { }
 
-    double get_diff_max() const {
+    [[nodiscard]] double get_diff_max() const {
         return diff_max_;
     }
 
-    double get_max_valid() const {
+    [[nodiscard]] double get_max_valid() const {
         return max_valid_;
     }
 
-    double get_max_actual() const {
+    [[nodiscard]] double get_max_actual() const {
         return max_actual_;
     }
 
-    double get_diff_mean() const {
+    [[nodiscard]] double get_diff_mean() const {
         return diff_mean_;
     }
 
-    double get_diff_std_dev() const {
+    [[nodiscard]] double get_diff_std_dev() const {
         return diff_std_dev_;
     }
 
-    bool empty() const {
+    [[nodiscard]] bool empty() const {
         return empty_;
     }
 
-    std::string csv_header() const {
+    [[nodiscard]] std::string csv_header() const {
         return "Max,Mean,Stddev";
     }
 
-    std::string csv_data() const {
+    [[nodiscard]] std::string csv_data() const {
         std::stringstream ss;
         ss << std::scientific << get_diff_max() << "," << get_diff_mean() << "," << get_diff_std_dev();
         return ss.str();

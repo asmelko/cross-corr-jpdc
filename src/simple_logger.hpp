@@ -21,13 +21,13 @@ public:
 
     }
 
-    void log(const std::string& message) {
+    void log(const std::string& message) const {
         if (print_progress_) {
             std::cout << message << std::endl;
         }
     }
 
-    void result_stats(const validation_results& results, std::optional<bool> print_header_override = std::nullopt) {
+    void result_stats(const validation_results& results, std::optional<bool> print_header_override = std::nullopt) const {
         if (print_progress_) {
             std::cout << results;
         } else {

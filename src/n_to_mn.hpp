@@ -81,6 +81,7 @@ public:
     const data_array<T, ALLOC>& refs() const override {
         return refs_;
     }
+
     const data_array<T, ALLOC>& targets() const override {
         return targets_;
     }
@@ -110,22 +111,20 @@ protected:
 private:
     data_array<T, ALLOC> refs_;
     data_array<T, ALLOC> targets_;
-
     data_array<T, ALLOC> results_;
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class naive_original_alg_n_to_mn: public n_to_mn<T, BENCH_TYPE, ALLOC> {
+class naive_gpu_n_to_mn: public n_to_mn<T, BENCH_TYPE, ALLOC> {
 public:
-    explicit naive_original_alg_n_to_mn([[maybe_unused]] const json& args, std::chrono::nanoseconds min_measured_time)
-        :n_to_mn<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), refs_(), targets_(), results_()
-    {
-
-    }
+    naive_gpu_n_to_mn(std::size_t num_measurements, std::chrono::nanoseconds min_measured_time)
+        :n_to_mn<T, BENCH_TYPE, ALLOC>(false, num_measurements, min_measured_time), refs_(), targets_(), results_()
+    {}
 
     const data_array<T, ALLOC>& refs() const override {
         return refs_;
     }
+
     const data_array<T, ALLOC>& targets() const override {
         return targets_;
     }
@@ -133,7 +132,6 @@ public:
     const data_array<T, ALLOC>& results() const override {
         return results_;
     }
-
 protected:
     void load_impl(const std::filesystem::path& ref_path, const std::filesystem::path& def_path) override {
         refs_ = load_matrix_array_from_csv<T, no_padding, ALLOC>(ref_path);
@@ -157,20 +155,6 @@ protected:
         cuda_memcpy_to_device(d_targets_, targets_);
     }
 
-    void run_impl() override {
-        CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
-            run_cross_corr_naive_original(
-                d_refs_,
-                d_targets_,
-                d_results_,
-                targets_.matrix_size(),
-                results_.matrix_size(),
-                refs_.num_matrices(),
-                targets_.num_matrices() / refs_.num_matrices()
-            )
-        );
-    }
-
     void finalize_impl() override {
         cuda_memcpy_from_device(results_, d_results_);
     }
@@ -181,17 +165,8 @@ protected:
         CUCH(cudaFree(d_refs_));
     }
 
-    std::vector<std::string> measurement_labels_impl() const override {
-        return this->measure_alg() ? labels : std::vector<std::string>{};
-    }
-
-private:
-
-    static std::vector<std::string> labels;
-
     data_array<T, ALLOC> refs_;
     data_array<T, ALLOC> targets_;
-
     data_array<T, ALLOC> results_;
 
     T* d_refs_;
@@ -199,16 +174,49 @@ private:
     T* d_results_;
 };
 
-template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
-std::vector<std::string> naive_original_alg_n_to_mn<T, BENCH_TYPE, ALLOC>::labels{
-    "Kernel"
+template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
+class naive_original_alg_n_to_mn: public naive_gpu_n_to_mn<T, BENCH_TYPE, ALLOC> {
+public:
+    explicit naive_original_alg_n_to_mn([[maybe_unused]] const json& args, std::chrono::nanoseconds min_measured_time)
+        :naive_gpu_n_to_mn<T, BENCH_TYPE, ALLOC>(std::size(labels), min_measured_time)
+    {
+
+    }
+protected:
+    void run_impl() override {
+        CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
+            run_cross_corr_naive_original(
+                this->d_refs_,
+                this->d_targets_,
+                this->d_results_,
+                this->targets_.matrix_size(),
+                this->results_.matrix_size(),
+                this->refs_.num_matrices(),
+                this->targets_.num_matrices() / this->refs_.num_matrices()
+            )
+        );
+    }
+
+    [[nodiscard]] std::vector<const char*> measurement_labels_impl() const override {
+        return this->measure_alg() ?
+               std::vector<const char*>(std::begin(labels), std::end(labels)) :
+               std::vector<const char*>{};
+    }
+
+private:
+    inline static const char* labels[] = {
+        "Kernel"
+    };
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
 class fft_original_alg_n_to_mn: public n_to_mn<T, BENCH_TYPE, ALLOC> {
 public:
     explicit fft_original_alg_n_to_mn([[maybe_unused]] const json& args, std::chrono::nanoseconds min_measured_time)
-        :n_to_mn<T, BENCH_TYPE, ALLOC>(true, labels.size(), min_measured_time), refs_(), targets_(), results_(), fft_buffer_size_(0)
+        :n_to_mn<T, BENCH_TYPE, ALLOC>(true, std::size(labels), min_measured_time),
+            refs_(), targets_(), results_(), fft_buffer_size_(0),
+            fft_plan_(), fft_inv_plan_()
+
     {
         hadamard_threads_per_block_ = args.value("hadamard_threads_per_block", 256);
     }
@@ -225,7 +233,7 @@ public:
         return results_;
     }
 
-    std::vector<std::pair<std::string, std::string>> additional_properties() const override {
+    [[nodiscard]] std::vector<std::pair<std::string, std::string>> additional_properties() const override {
         return std::vector<std::pair<std::string, std::string>>{
             std::make_pair("hadamard_threads_per_block", std::to_string(hadamard_threads_per_block_))
         };
@@ -303,15 +311,23 @@ protected:
         CUCH(cudaFree(d_inputs_));
     }
 
-    std::vector<std::string> measurement_labels_impl() const override {
-        return this->measure_alg() ? labels : std::vector<std::string>{};
+    [[nodiscard]] std::vector<const char*> measurement_labels_impl() const override {
+        return this->measure_alg() ?
+               std::vector<const char*>(std::begin(labels), std::end(labels)) :
+               std::vector<const char*>{};
     }
 
 private:
     using fft_real_t = typename real_trait<T>::type;
     using fft_complex_t = typename complex_trait<T>::type;
 
-    static std::vector<std::string> labels;
+    inline static const char* labels[] = {
+        "Forward FFT",
+        "Hadamard",
+        "Inverse FFT",
+        "Allocation",
+        "Plan"
+    };
 
     data_array<T, ALLOC> refs_;
     data_array<T, ALLOC> targets_;
@@ -330,21 +346,13 @@ private:
     dsize_t hadamard_threads_per_block_;
 };
 
-template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
-std::vector<std::string> fft_original_alg_n_to_mn<T, BENCH_TYPE, ALLOC>::labels{
-    "Forward FFT",
-    "Hadamard",
-    "Inverse FFT",
-    "Allocation",
-    "Plan"
-};
-
-
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
 class fft_reduced_transfer_n_to_mn: public n_to_mn<T, BENCH_TYPE, ALLOC> {
 public:
     explicit fft_reduced_transfer_n_to_mn([[maybe_unused]] const json& args, std::chrono::nanoseconds min_measured_time)
-        :n_to_mn<T, BENCH_TYPE, ALLOC>(true, labels.size(), min_measured_time), refs_(), targets_(), results_(), fft_buffer_size_(0)
+        :n_to_mn<T, BENCH_TYPE, ALLOC>(true, std::size(labels), min_measured_time),
+            refs_(), targets_(), results_(), fft_buffer_size_(0), num_inputs_(0),
+            fft_plan_(), fft_inv_plan_()
     {
         scatter_threads_per_block_  = args.value("scatter_threads_per_block", 256);
         scatter_items_per_thread_ = args.value("scatter_items_per_thread", 10);
@@ -363,7 +371,7 @@ public:
         return results_;
     }
 
-    std::vector<std::pair<std::string, std::string>> additional_properties() const override {
+    [[nodiscard]] std::vector<std::pair<std::string, std::string>> additional_properties() const override {
         return std::vector<std::pair<std::string, std::string>>{
             std::make_pair("scatter_threads_per_block", std::to_string(scatter_threads_per_block_)),
             std::make_pair("scatter_items_per_thread", std::to_string(scatter_items_per_thread_)),
@@ -462,15 +470,25 @@ protected:
         CUCH(cudaFree(d_inputs_));
     }
 
-    std::vector<std::string> measurement_labels_impl() const override {
-        return this->measure_alg() ? labels : std::vector<std::string>{};
+    [[nodiscard]] std::vector<const char*> measurement_labels_impl() const override {
+        return this->measure_alg() ?
+               std::vector<const char*>(std::begin(labels), std::end(labels)) :
+               std::vector<const char*>{};
     }
 
 private:
     using fft_real_t = typename real_trait<T>::type;
     using fft_complex_t = typename complex_trait<T>::type;
 
-    static std::vector<std::string> labels;
+    inline static const char* labels[] = {
+        "Forward FFT",
+        "Hadamard",
+        "Inverse FFT",
+        "ToDevice",
+        "Scatter",
+        "Allocation",
+        "Plan"
+    };
 
     data_array<T, ALLOC> refs_;
     data_array<T, ALLOC> targets_;
@@ -494,17 +512,5 @@ private:
     dsize_t hadamard_threads_per_block_;
 
 };
-
-template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
-std::vector<std::string> fft_reduced_transfer_n_to_mn<T, BENCH_TYPE, ALLOC>::labels{
-    "Forward FFT",
-    "Hadamard",
-    "Inverse FFT",
-    "ToDevice",
-    "Scatter",
-    "Allocation",
-    "Plan"
-};
-
 
 }

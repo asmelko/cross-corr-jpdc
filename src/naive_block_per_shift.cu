@@ -1,16 +1,12 @@
 #include <cuda_runtime.h>
 
 #include <cooperative_groups.h>
-#include <cooperative_groups/memcpy_async.h>
 #include <cooperative_groups/reduce.h>
 
-#include <cassert>
 #include <stdexcept>
 
 #include "types.cuh"
-#include "cuda_helpers.cuh"
 #include "shared_mem.cuh"
-#include "row_distribution.cuh"
 #include "warp_size.hpp"
 
 namespace cg = cooperative_groups;

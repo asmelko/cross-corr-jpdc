@@ -2,8 +2,6 @@
 #include <cuda_runtime.h>
 
 #include <cooperative_groups.h>
-#include <cooperative_groups/memcpy_async.h>
-#include <cooperative_groups/reduce.h>
 
 #include <stdexcept>
 #include <cassert>
@@ -391,7 +389,7 @@ __host__ void ccn_warp_shuffle_right_mats_dispatch(
                 num_right_matrices
             );
         } else {
-            ccn_warp_shuffle_right_mats_dispatch<MAX_RIGHT_MATRICES_PER_THREAD>(
+            ccn_warp_shuffle_right_mats_dispatch<MAX_RIGHT_MATRICES_PER_THREAD - 1>(
                 left,
                 right,
                 out,
@@ -593,7 +591,7 @@ __host__ void ccn_warp_shuffle_work_distribution_right_mats_dispatch(
                 max_rows_per_thread
             );
         } else {
-            ccn_warp_shuffle_work_distribution_right_mats_dispatch<MAX_RIGHT_MATRICES_PER_THREAD, DIST>(
+            ccn_warp_shuffle_work_distribution_right_mats_dispatch<MAX_RIGHT_MATRICES_PER_THREAD - 1, DIST>(
                 left,
                 right,
                 out,

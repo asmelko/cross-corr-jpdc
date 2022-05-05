@@ -83,7 +83,7 @@ void cuda_memcpy_from_device(DATA& dst, typename DATA::value_type* src) {
 }
 
 inline std::ostream& operator<<(std::ostream& out, const std::vector<float2>& vec) {
-    std::string sep = "";
+    std::string sep;
     for(auto&& val: vec) {
         out << sep << "[" << val.x << "," << val.y <<"]";
         sep = ", ";

@@ -6,7 +6,8 @@
 
 namespace cross {
 inline __device__ bool bounds_check(int idx, dsize_t size) {
-    return idx >= 0 && idx < size;
+    // After we check that idx is not negative, we can cast it to unsigned
+    return idx >= 0 && static_cast<dsize_t>(idx) < size;
 }
 
 /**

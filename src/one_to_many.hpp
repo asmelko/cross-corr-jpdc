@@ -46,6 +46,7 @@ public:
     const data_array<T, ALLOC>& refs() const override {
         return ref_;
     }
+
     const data_array<T, ALLOC>& targets() const override {
         return targets_;
     }
@@ -74,23 +75,21 @@ protected:
 private:
     data_array<T, ALLOC> ref_;
     data_array<T, ALLOC> targets_;
-
     data_array<T, ALLOC> results_;
 };
 
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class naive_original_alg_one_to_many: public one_to_many<T, BENCH_TYPE, ALLOC> {
+class naive_gpu_one_to_many: public one_to_many<T, BENCH_TYPE, ALLOC> {
 public:
-    explicit naive_original_alg_one_to_many([[maybe_unused]] const json& args, std::chrono::nanoseconds min_measured_time)
-        :one_to_many<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), targets_(), results_()
-    {
-
-    }
+    naive_gpu_one_to_many(std::size_t num_measurements, std::chrono::nanoseconds min_measured_time)
+        :one_to_many<T, BENCH_TYPE, ALLOC>(false, num_measurements, min_measured_time)
+    {}
 
     const data_array<T, ALLOC>& refs() const override {
         return ref_;
     }
+
     const data_array<T, ALLOC>& targets() const override {
         return targets_;
     }
@@ -98,7 +97,6 @@ public:
     const data_array<T, ALLOC>& results() const override {
         return results_;
     }
-
 protected:
     void load_impl(const std::filesystem::path& ref_path, const std::filesystem::path& target_path) override {
         ref_ = load_matrix_from_csv<T, no_padding, ALLOC>(ref_path);
@@ -121,22 +119,6 @@ protected:
         cuda_memcpy_to_device(d_targets_, targets_);
     }
 
-    void run_impl() override {
-        CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
-            run_cross_corr_naive_original(
-                d_ref_,
-                d_targets_,
-                d_results_,
-                targets_.matrix_size(),
-                results_.matrix_size(),
-                // Subregions_per_pic tells us the number of reference subregions from the picture
-                1,
-                // Batch size is the number of deformed subregions for each reference subregion
-                targets_.num_matrices()
-            )
-        );
-    }
-
     void finalize_impl() override {
         cuda_memcpy_from_device(results_, d_results_);
     }
@@ -147,17 +129,8 @@ protected:
         CUCH(cudaFree(d_ref_));
     }
 
-    std::vector<std::string> measurement_labels_impl() const override {
-        return this->measure_alg() ? labels : std::vector<std::string>{};
-    }
-
-private:
-
-    static std::vector<std::string> labels;
-
     data_array<T, ALLOC> ref_;
     data_array<T, ALLOC> targets_;
-
     data_array<T, ALLOC> results_;
 
     T* d_ref_;
@@ -165,117 +138,97 @@ private:
     T* d_results_;
 };
 
-template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
-std::vector<std::string> naive_original_alg_one_to_many<T, BENCH_TYPE, ALLOC>::labels{
-    "Kernel"
+template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
+class naive_original_alg_one_to_many: public naive_gpu_one_to_many<T, BENCH_TYPE, ALLOC> {
+public:
+    explicit naive_original_alg_one_to_many([[maybe_unused]] const json& args, std::chrono::nanoseconds min_measured_time)
+        :naive_gpu_one_to_many<T, BENCH_TYPE, ALLOC>(std::size(labels), min_measured_time)
+    {
+
+    }
+protected:
+    void run_impl() override {
+        CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
+            run_cross_corr_naive_original(
+                this->d_ref_,
+                this->d_targets_,
+                this->d_results_,
+                this->targets_.matrix_size(),
+                this->results_.matrix_size(),
+                // Subregions_per_pic tells us the number of reference subregions from the picture
+                1,
+                // Batch size is the number of deformed subregions for each reference subregion
+                this->targets_.num_matrices()
+            )
+        );
+    }
+
+    [[nodiscard]] std::vector<const char*> measurement_labels_impl() const override {
+        return this->measure_alg() ?
+               std::vector<const char*>(std::begin(labels), std::end(labels)) :
+               std::vector<const char*>{};
+    }
+
+private:
+    inline static const char* labels[] = {
+        "Kernel"
+    };
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class naive_warp_shuffle_one_to_many: public one_to_many<T, BENCH_TYPE, ALLOC> {
+class naive_warp_shuffle_one_to_many: public naive_gpu_one_to_many<T, BENCH_TYPE, ALLOC> {
 public:
     explicit naive_warp_shuffle_one_to_many(const json& args, std::chrono::nanoseconds min_measured_time)
-        :one_to_many<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), targets_(), results_()
+        :naive_gpu_one_to_many<T, BENCH_TYPE, ALLOC>(std::size(labels), min_measured_time)
     {
         warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
         right_matrices_per_thread_ = args.value("right_matrices_per_thread", 2);
     }
 
-    const data_array<T, ALLOC>& refs() const override {
-        return ref_;
-    }
-
-    const data_array<T, ALLOC>& targets() const override {
-        return targets_;
-    }
-
-    const data_array<T, ALLOC>& results() const override {
-        return results_;
-    }
-
-    std::vector<std::pair<std::string, std::string>> additional_properties() const override {
+    [[nodiscard]] std::vector<std::pair<std::string, std::string>> additional_properties() const override {
         return std::vector<std::pair<std::string, std::string>>{
             std::make_pair("warps_per_thread_block", std::to_string(warps_per_thread_block_)),
             std::make_pair("right_matrices_per_thread", std::to_string(right_matrices_per_thread_))
         };
     }
-
 protected:
-    void load_impl(const std::filesystem::path& ref_path, const std::filesystem::path& target_path) override {
-        ref_ = load_matrix_from_csv<T, no_padding, ALLOC>(ref_path);
-        targets_ = load_matrix_from_csv<T, no_padding, ALLOC>(target_path);
-
-        this->check_matrices_same_size(ref_, targets_);
-    }
-
-    void prepare_impl() override {
-        results_ = data_array<T, ALLOC>{ref_.matrix_size() + targets_.matrix_size() - 1, targets_.num_matrices()};
-
-        cuda_malloc(&d_ref_, ref_.size());
-        cuda_malloc(&d_targets_, targets_.size());
-        cuda_malloc(&d_results_, results_.size());
-    }
-
-    void transfer_impl() override {
-        cuda_memcpy_to_device(d_ref_, ref_);
-        cuda_memcpy_to_device(d_targets_, targets_);
-    }
-
     void run_impl() override {
         CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
                      run_ccn_warp_shuffle(
-                         d_ref_,
-                         d_targets_,
-                         d_results_,
-                         targets_.matrix_size(),
-                         results_.matrix_size(),
-                         targets_.num_matrices(),
+                         this->d_ref_,
+                         this->d_targets_,
+                         this->d_results_,
+                         this->targets_.matrix_size(),
+                         this->results_.matrix_size(),
+                         this->targets_.num_matrices(),
                          warps_per_thread_block_,
                          right_matrices_per_thread_
                      )
         );
     }
 
-    void finalize_impl() override {
-        cuda_memcpy_from_device(results_, d_results_);
-    }
 
-    void free_impl() override {
-        CUCH(cudaFree(d_results_));
-        CUCH(cudaFree(d_targets_));
-        CUCH(cudaFree(d_ref_));
-    }
 
-    std::vector<std::string> measurement_labels_impl() const override {
-        return this->measure_alg() ? labels : std::vector<std::string>{};
+    [[nodiscard]] std::vector<const char*> measurement_labels_impl() const override {
+        return this->measure_alg() ?
+               std::vector<const char*>(std::begin(labels), std::end(labels)) :
+               std::vector<const char*>{};
     }
 
 private:
-
-    static std::vector<std::string> labels;
-
-    data_array<T, ALLOC> ref_;
-    data_array<T, ALLOC> targets_;
-
-    data_array<T, ALLOC> results_;
-
-    T* d_ref_;
-    T* d_targets_;
-    T* d_results_;
+    inline static const char* labels[] = {
+        "Kernel"
+    };
 
     dsize_t warps_per_thread_block_;
     dsize_t right_matrices_per_thread_;
 };
 
-template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
-std::vector<std::string> naive_warp_shuffle_one_to_many<T, BENCH_TYPE, ALLOC>::labels{
-    "Kernel"
-};
-
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class naive_warp_shuffle_work_distribution_one_to_many: public one_to_many<T, BENCH_TYPE, ALLOC> {
+class naive_warp_shuffle_work_distribution_one_to_many: public naive_gpu_one_to_many<T, BENCH_TYPE, ALLOC> {
 public:
     explicit naive_warp_shuffle_work_distribution_one_to_many(const json& args, std::chrono::nanoseconds min_measured_time)
-        :one_to_many<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), targets_(), results_()
+        :naive_gpu_one_to_many<T, BENCH_TYPE, ALLOC>(std::size(labels), min_measured_time)
     {
         warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
         right_matrices_per_thread_ = args.value("right_matrices_per_thread", 2);
@@ -283,19 +236,9 @@ public:
         distribution_type_ = from_string(args.value("distribution_type", "rectangle"));
     }
 
-    const data_array<T, ALLOC>& refs() const override {
-        return ref_;
-    }
 
-    const data_array<T, ALLOC>& targets() const override {
-        return targets_;
-    }
 
-    const data_array<T, ALLOC>& results() const override {
-        return results_;
-    }
-
-    std::vector<std::pair<std::string, std::string>> additional_properties() const override {
+    [[nodiscard]] std::vector<std::pair<std::string, std::string>> additional_properties() const override {
         return std::vector<std::pair<std::string, std::string>>{
             std::make_pair("warps_per_thread_block", std::to_string(warps_per_thread_block_)),
             std::make_pair("right_matrices_per_thread", std::to_string(right_matrices_per_thread_)),
@@ -305,25 +248,7 @@ public:
     }
 
 protected:
-    void load_impl(const std::filesystem::path& ref_path, const std::filesystem::path& target_path) override {
-        ref_ = load_matrix_from_csv<T, no_padding, ALLOC>(ref_path);
-        targets_ = load_matrix_from_csv<T, no_padding, ALLOC>(target_path);
 
-        this->check_matrices_same_size(ref_, targets_);
-    }
-
-    void prepare_impl() override {
-        results_ = data_array<T, ALLOC>{ref_.matrix_size() + targets_.matrix_size() - 1, targets_.num_matrices()};
-
-        cuda_malloc(&d_ref_, ref_.size());
-        cuda_malloc(&d_targets_, targets_.size());
-        cuda_malloc(&d_results_, results_.size());
-    }
-
-    void transfer_impl() override {
-        cuda_memcpy_to_device(d_ref_, ref_);
-        cuda_memcpy_to_device(d_targets_, targets_);
-    }
 
     void run_impl() override {
         switch (distribution_type_) {
@@ -339,32 +264,18 @@ protected:
         }
     }
 
-    void finalize_impl() override {
-        cuda_memcpy_from_device(results_, d_results_);
-    }
 
-    void free_impl() override {
-        CUCH(cudaFree(d_results_));
-        CUCH(cudaFree(d_targets_));
-        CUCH(cudaFree(d_ref_));
-    }
 
-    std::vector<std::string> measurement_labels_impl() const override {
-        return this->measure_alg() ? labels : std::vector<std::string>{};
+    [[nodiscard]] std::vector<const char*> measurement_labels_impl() const override {
+        return this->measure_alg() ?
+               std::vector<const char*>(std::begin(labels), std::end(labels)) :
+               std::vector<const char*>{};
     }
 
 private:
-
-    static std::vector<std::string> labels;
-
-    data_array<T, ALLOC> ref_;
-    data_array<T, ALLOC> targets_;
-
-    data_array<T, ALLOC> results_;
-
-    T* d_ref_;
-    T* d_targets_;
-    T* d_results_;
+    inline static const char* labels[] = {
+        "Kernel"
+    };
 
     dsize_t warps_per_thread_block_;
     dsize_t right_matrices_per_thread_;
@@ -375,15 +286,15 @@ private:
     void run_kernel() {
         CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
             // Need to zero out as work distribution uses atomicAdd on the results matrix
-            cuda_memset(d_results_, 0, results_.size());
+            cuda_memset(this->d_results_, 0, this->results_.size());
 
             run_ccn_warp_shuffle_work_distribution<DISTRIBUTION>(
-                d_ref_,
-                d_targets_,
-                d_results_,
-                targets_.matrix_size(),
-                results_.matrix_size(),
-                targets_.num_matrices(),
+                this->d_ref_,
+                this->d_targets_,
+                this->d_results_,
+                this->targets_.matrix_size(),
+                this->results_.matrix_size(),
+                this->targets_.num_matrices(),
                 warps_per_thread_block_,
                 right_matrices_per_thread_,
                 rows_per_thread_
@@ -392,72 +303,34 @@ private:
     }
 };
 
-template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
-std::vector<std::string> naive_warp_shuffle_work_distribution_one_to_many<T, BENCH_TYPE, ALLOC>::labels{
-    "Kernel"
-};
-
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class naive_shuffle_multirow_right_multimat_right_one_to_many: public one_to_many<T, BENCH_TYPE, ALLOC> {
+class naive_shuffle_multirow_right_multimat_right_one_to_many: public naive_gpu_one_to_many<T, BENCH_TYPE, ALLOC> {
 public:
     explicit naive_shuffle_multirow_right_multimat_right_one_to_many(const json& args, std::chrono::nanoseconds min_measured_time)
-        :one_to_many<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), targets_(), results_()
+        :naive_gpu_one_to_many<T, BENCH_TYPE, ALLOC>(std::size(labels), min_measured_time)
     {
         warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
         right_rows_per_thread_ = args.value("right_rows_per_thread", 4);
         right_matrices_per_thread_ = args.value("right_matrices_per_thread", 4);
     }
 
-    const data_array<T, ALLOC>& refs() const override {
-        return ref_;
-    }
-
-    const data_array<T, ALLOC>& targets() const override {
-        return targets_;
-    }
-
-    const data_array<T, ALLOC>& results() const override {
-        return results_;
-    }
-
-    std::vector<std::pair<std::string, std::string>> additional_properties() const override {
+    [[nodiscard]] std::vector<std::pair<std::string, std::string>> additional_properties() const override {
         return std::vector<std::pair<std::string, std::string>>{
             std::make_pair("warps_per_thread_block", std::to_string(warps_per_thread_block_)),
             std::make_pair("right_rows_per_thread", std::to_string(right_rows_per_thread_)),
             std::make_pair("right_matrices_per_thread", std::to_string(right_matrices_per_thread_))
         };
     }
-
 protected:
-    void load_impl(const std::filesystem::path& ref_path, const std::filesystem::path& target_path) override {
-        ref_ = load_matrix_from_csv<T, no_padding, ALLOC>(ref_path);
-        targets_ = load_matrix_from_csv<T, no_padding, ALLOC>(target_path);
-
-        this->check_matrices_same_size(ref_, targets_);
-    }
-
-    void prepare_impl() override {
-        results_ = data_array<T, ALLOC>{ref_.matrix_size() + targets_.matrix_size() - 1, targets_.num_matrices()};
-
-        cuda_malloc(&d_ref_, ref_.size());
-        cuda_malloc(&d_targets_, targets_.size());
-        cuda_malloc(&d_results_, results_.size());
-    }
-
-    void transfer_impl() override {
-        cuda_memcpy_to_device(d_ref_, ref_);
-        cuda_memcpy_to_device(d_targets_, targets_);
-    }
-
     void run_impl() override {
         CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
                               run_ccn_shuffle_multirow_right_multimat_right(
-                                  d_ref_,
-                                  d_targets_,
-                                  d_results_,
-                                  targets_.matrix_size(),
-                                  results_.matrix_size(),
-                                  targets_.num_matrices(),
+                                  this->d_ref_,
+                                  this->d_targets_,
+                                  this->d_results_,
+                                  this->targets_.matrix_size(),
+                                  this->results_.matrix_size(),
+                                  this->targets_.num_matrices(),
                                   warps_per_thread_block_,
                                   right_rows_per_thread_,
                                   right_matrices_per_thread_
@@ -465,48 +338,26 @@ protected:
         );
     }
 
-    void finalize_impl() override {
-        cuda_memcpy_from_device(results_, d_results_);
+    [[nodiscard]] std::vector<const char*> measurement_labels_impl() const override {
+        return this->measure_alg() ?
+               std::vector<const char*>(std::begin(labels), std::end(labels)) :
+               std::vector<const char*>{};
     }
-
-    void free_impl() override {
-        CUCH(cudaFree(d_results_));
-        CUCH(cudaFree(d_targets_));
-        CUCH(cudaFree(d_ref_));
-    }
-
-    std::vector<std::string> measurement_labels_impl() const override {
-        return this->measure_alg() ? labels : std::vector<std::string>{};
-    }
-
 private:
-
-    static std::vector<std::string> labels;
-
-    data_array<T, ALLOC> ref_;
-    data_array<T, ALLOC> targets_;
-
-    data_array<T, ALLOC> results_;
-
-    T* d_ref_;
-    T* d_targets_;
-    T* d_results_;
+    inline static const char* labels[] = {
+        "Kernel"
+    };
 
     dsize_t warps_per_thread_block_;
     dsize_t right_rows_per_thread_;
     dsize_t right_matrices_per_thread_;
 };
 
-template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
-std::vector<std::string> naive_shuffle_multirow_right_multimat_right_one_to_many<T, BENCH_TYPE, ALLOC>::labels{
-    "Kernel"
-};
-
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class naive_shuffle_multirow_both_multimat_right_one_to_many: public one_to_many<T, BENCH_TYPE, ALLOC> {
+class naive_shuffle_multirow_both_multimat_right_one_to_many: public naive_gpu_one_to_many<T, BENCH_TYPE, ALLOC> {
 public:
     explicit naive_shuffle_multirow_both_multimat_right_one_to_many(const json& args, std::chrono::nanoseconds min_measured_time)
-        :one_to_many<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), targets_(), results_()
+        :naive_gpu_one_to_many<T, BENCH_TYPE, ALLOC>(std::size(labels), min_measured_time)
     {
         // TODO: Rename in all other shuffle algorithms to this
         warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
@@ -515,19 +366,7 @@ public:
         left_rows_per_iteration_ = args.value("left_rows_per_iteration", 4);
     }
 
-    const data_array<T, ALLOC>& refs() const override {
-        return ref_;
-    }
-
-    const data_array<T, ALLOC>& targets() const override {
-        return targets_;
-    }
-
-    const data_array<T, ALLOC>& results() const override {
-        return results_;
-    }
-
-    std::vector<std::pair<std::string, std::string>> additional_properties() const override {
+    [[nodiscard]] std::vector<std::pair<std::string, std::string>> additional_properties() const override {
         return std::vector<std::pair<std::string, std::string>>{
             std::make_pair("warps_per_thread_block", std::to_string(warps_per_thread_block_)),
             std::make_pair("shifts_per_thread_right_matrix", std::to_string(shifts_per_thread_right_matrix_)),
@@ -535,37 +374,16 @@ public:
             std::make_pair("left_rows_per_iteration", std::to_string(left_rows_per_iteration_))
         };
     }
-
 protected:
-    void load_impl(const std::filesystem::path& ref_path, const std::filesystem::path& target_path) override {
-        ref_ = load_matrix_from_csv<T, no_padding, ALLOC>(ref_path);
-        targets_ = load_matrix_from_csv<T, no_padding, ALLOC>(target_path);
-
-        this->check_matrices_same_size(ref_, targets_);
-    }
-
-    void prepare_impl() override {
-        results_ = data_array<T, ALLOC>{ref_.matrix_size() + targets_.matrix_size() - 1, targets_.num_matrices()};
-
-        cuda_malloc(&d_ref_, ref_.size());
-        cuda_malloc(&d_targets_, targets_.size());
-        cuda_malloc(&d_results_, results_.size());
-    }
-
-    void transfer_impl() override {
-        cuda_memcpy_to_device(d_ref_, ref_);
-        cuda_memcpy_to_device(d_targets_, targets_);
-    }
-
     void run_impl() override {
         CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
                               run_ccn_shuffle_one_to_many_multirow_both_multimat_right(
-                                  d_ref_,
-                                  d_targets_,
-                                  d_results_,
-                                  targets_.matrix_size(),
-                                  results_.matrix_size(),
-                                  targets_.num_matrices(),
+                                  this->d_ref_,
+                                  this->d_targets_,
+                                  this->d_results_,
+                                  this->targets_.matrix_size(),
+                                  this->results_.matrix_size(),
+                                  this->targets_.num_matrices(),
                                   warps_per_thread_block_,
                                   shifts_per_thread_right_matrix_,
                                   right_matrices_per_thread_,
@@ -574,32 +392,15 @@ protected:
         );
     }
 
-    void finalize_impl() override {
-        cuda_memcpy_from_device(results_, d_results_);
+    [[nodiscard]] std::vector<const char*> measurement_labels_impl() const override {
+        return this->measure_alg() ?
+               std::vector<const char*>(std::begin(labels), std::end(labels)) :
+               std::vector<const char*>{};
     }
-
-    void free_impl() override {
-        CUCH(cudaFree(d_results_));
-        CUCH(cudaFree(d_targets_));
-        CUCH(cudaFree(d_ref_));
-    }
-
-    std::vector<std::string> measurement_labels_impl() const override {
-        return this->measure_alg() ? labels : std::vector<std::string>{};
-    }
-
 private:
-
-    static std::vector<std::string> labels;
-
-    data_array<T, ALLOC> ref_;
-    data_array<T, ALLOC> targets_;
-
-    data_array<T, ALLOC> results_;
-
-    T* d_ref_;
-    T* d_targets_;
-    T* d_results_;
+    inline static const char* labels[] = {
+        "Kernel"
+    };
 
     dsize_t warps_per_thread_block_;
     dsize_t shifts_per_thread_right_matrix_;
@@ -607,16 +408,11 @@ private:
     dsize_t left_rows_per_iteration_;
 };
 
-template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
-std::vector<std::string> naive_shuffle_multirow_both_multimat_right_one_to_many<T, BENCH_TYPE, ALLOC>::labels{
-    "Kernel"
-};
-
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class naive_warp_per_shift_shared_mem_one_to_many: public one_to_many<T, BENCH_TYPE, ALLOC> {
+class naive_warp_per_shift_shared_mem_one_to_many: public naive_gpu_one_to_many<T, BENCH_TYPE, ALLOC> {
 public:
     explicit naive_warp_per_shift_shared_mem_one_to_many(const json& args, std::chrono::nanoseconds min_measured_time)
-        :one_to_many<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), targets_(), results_()
+        :naive_gpu_one_to_many<T, BENCH_TYPE, ALLOC>(std::size(labels), min_measured_time)
     {
         shifts_per_thread_block_ = args.value(SHIFTS_PER_THREAD_BLOCK_ARG, 16);
         shared_mem_row_size_ = args.value(SHARED_MEM_ROW_SIZE_ARG, 32);
@@ -641,19 +437,7 @@ public:
         }
     }
 
-    const data_array<T, ALLOC>& refs() const override {
-        return ref_;
-    }
-
-    const data_array<T, ALLOC>& targets() const override {
-        return targets_;
-    }
-
-    const data_array<T, ALLOC>& results() const override {
-        return results_;
-    }
-
-    std::vector<std::pair<std::string, std::string>> additional_properties() const override {
+    [[nodiscard]] std::vector<std::pair<std::string, std::string>> additional_properties() const override {
         return std::vector<std::pair<std::string, std::string>>{
             std::make_pair(SHIFTS_PER_THREAD_BLOCK_ARG, std::to_string(shifts_per_thread_block_)),
             std::make_pair(SHARED_MEM_ROW_SIZE_ARG, std::to_string(shared_mem_row_size_)),
@@ -665,40 +449,20 @@ public:
     }
 
 protected:
-    void load_impl(const std::filesystem::path& ref_path, const std::filesystem::path& target_path) override {
-        ref_ = load_matrix_from_csv<T, no_padding, ALLOC>(ref_path);
-        targets_ = load_matrix_from_csv<T, no_padding, ALLOC>(target_path);
-
-        this->check_matrices_same_size(ref_, targets_);
-    }
-
-    void prepare_impl() override {
-        results_ = data_array<T, ALLOC>{ref_.matrix_size() + targets_.matrix_size() - 1, targets_.num_matrices()};
-
-        cuda_malloc(&d_ref_, ref_.size());
-        cuda_malloc(&d_targets_, targets_.size());
-        cuda_malloc(&d_results_, results_.size());
-    }
-
-    void transfer_impl() override {
-        cuda_memcpy_to_device(d_ref_, ref_);
-        cuda_memcpy_to_device(d_targets_, targets_);
-    }
-
     void run_impl() override {
         CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
                       if (column_group_per_block_) {
                           // Need to zero out as work distribution uses atomicAdd on the results matrix
-                          cuda_memset(d_results_, 0, results_.size());
+                          cuda_memset(this->d_results_, 0, this->results_.size());
                       }
 
                      run_ccn_warp_per_shift_shared_mem(
-                         d_ref_,
-                         d_targets_,
-                         d_results_,
-                         targets_.matrix_size(),
-                         results_.matrix_size(),
-                         targets_.num_matrices(),
+                         this->d_ref_,
+                         this->d_targets_,
+                         this->d_results_,
+                         this->targets_.matrix_size(),
+                         this->results_.matrix_size(),
+                         this->targets_.num_matrices(),
                          shifts_per_thread_block_,
                          shared_mem_row_size_,
                          shared_mem_rows_,
@@ -709,39 +473,23 @@ protected:
         );
     }
 
-    void finalize_impl() override {
-        cuda_memcpy_from_device(results_, d_results_);
-    }
-
-    void free_impl() override {
-        CUCH(cudaFree(d_results_));
-        CUCH(cudaFree(d_targets_));
-        CUCH(cudaFree(d_ref_));
-    }
-
-    std::vector<std::string> measurement_labels_impl() const override {
-        return this->measure_alg() ? labels : std::vector<std::string>{};
+    [[nodiscard]] std::vector<const char*> measurement_labels_impl() const override {
+        return this->measure_alg() ?
+               std::vector<const char*>(std::begin(labels), std::end(labels)) :
+               std::vector<const char*>{};
     }
 
 private:
+    inline static const char* labels[] = {
+        "Kernel"
+    };
 
-    static std::vector<std::string> labels;
-
-    inline static const std::string SHIFTS_PER_THREAD_BLOCK_ARG = "shifts_per_thread_block";
-    inline static const std::string SHARED_MEM_ROW_SIZE_ARG = "shared_mem_row_size";
-    inline static const std::string SHARED_MEM_ROWS_ARG = "shared_mem_rows";
-    inline static const std::string STRIDED_LOAD_ARG = "strided_load";
-    inline static const std::string COLUMN_GROUP_PER_BLOCK_ARG = "column_group_per_block";
-    inline static const std::string RIGHT_MATRICES_PER_BLOCK_ARG = "right_matrices_per_block";
-
-    data_array<T, ALLOC> ref_;
-    data_array<T, ALLOC> targets_;
-
-    data_array<T, ALLOC> results_;
-
-    T* d_ref_;
-    T* d_targets_;
-    T* d_results_;
+    inline static const char* SHIFTS_PER_THREAD_BLOCK_ARG = "shifts_per_thread_block";
+    inline static const char* SHARED_MEM_ROW_SIZE_ARG = "shared_mem_row_size";
+    inline static const char* SHARED_MEM_ROWS_ARG = "shared_mem_rows";
+    inline static const char* STRIDED_LOAD_ARG = "strided_load";
+    inline static const char* COLUMN_GROUP_PER_BLOCK_ARG = "column_group_per_block";
+    inline static const char* RIGHT_MATRICES_PER_BLOCK_ARG = "right_matrices_per_block";
 
     dsize_t shifts_per_thread_block_;
     dsize_t shared_mem_row_size_;
@@ -751,17 +499,13 @@ private:
     bool column_group_per_block_;
 };
 
-template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
-std::vector<std::string> naive_warp_per_shift_shared_mem_one_to_many<T, BENCH_TYPE, ALLOC>::labels{
-    "Kernel"
-};
-
-
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
 class fft_original_alg_one_to_many: public one_to_many<T, BENCH_TYPE, ALLOC> {
 public:
     explicit fft_original_alg_one_to_many([[maybe_unused]] const json& args, std::chrono::nanoseconds min_measured_time)
-        :one_to_many<T, BENCH_TYPE, ALLOC>(true, labels.size(), min_measured_time), ref_(), targets_(), results_(), fft_buffer_size_(0)
+        :one_to_many<T, BENCH_TYPE, ALLOC>(true, std::size(labels), min_measured_time),
+            ref_(), targets_(), results_(), fft_buffer_size_(0),
+            fft_plan_(), fft_inv_plan_()
     {
         hadamard_threads_per_block_ = args.value("hadamard_threads_per_block", 256);
     }
@@ -778,7 +522,7 @@ public:
         return results_;
     }
 
-    std::vector<std::pair<std::string, std::string>> additional_properties() const override {
+    [[nodiscard]] std::vector<std::pair<std::string, std::string>> additional_properties() const override {
         return std::vector<std::pair<std::string, std::string>>{
             std::make_pair("hadamard_threads_per_block", std::to_string(hadamard_threads_per_block_))
         };
@@ -856,15 +600,23 @@ protected:
         CUCH(cudaFree(d_inputs_));
     }
 
-    std::vector<std::string> measurement_labels_impl() const override {
-        return this->measure_alg() ? labels : std::vector<std::string>{};
+    [[nodiscard]] std::vector<const char*> measurement_labels_impl() const override {
+        return this->measure_alg() ?
+               std::vector<const char*>(std::begin(labels), std::end(labels)) :
+               std::vector<const char*>{};
     }
 
 private:
     using fft_real_t = typename real_trait<T>::type;
     using fft_complex_t = typename complex_trait<T>::type;
 
-    static std::vector<std::string> labels;
+    inline static const char* labels[] = {
+        "Forward FFT",
+        "Hadamard",
+        "Inverse FFT",
+        "Allocation",
+        "Plan"
+    };
 
     data_array<T, ALLOC> ref_;
     data_array<T, ALLOC> targets_;
@@ -883,20 +635,13 @@ private:
     dsize_t hadamard_threads_per_block_;
 };
 
-template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
-std::vector<std::string> fft_original_alg_one_to_many<T, BENCH_TYPE, ALLOC>::labels{
-    "Forward FFT",
-    "Hadamard",
-    "Inverse FFT",
-    "Allocation",
-    "Plan"
-};
-
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
 class fft_reduced_transfer_one_to_many: public one_to_many<T, BENCH_TYPE, ALLOC> {
 public:
     explicit fft_reduced_transfer_one_to_many([[maybe_unused]] const json& args, std::chrono::nanoseconds min_measured_time)
-        :one_to_many<T, BENCH_TYPE, ALLOC>(true, labels.size(), min_measured_time), ref_(), targets_(), results_(), fft_buffer_size_(0)
+        :one_to_many<T, BENCH_TYPE, ALLOC>(true, std::size(labels), min_measured_time),
+            ref_(), targets_(), results_(), fft_buffer_size_(0), num_inputs_(0),
+            fft_plan_(), fft_inv_plan_()
     {
         scatter_threads_per_block_  = args.value("scatter_threads_per_block", 256);
         scatter_items_per_thread_ = args.value("scatter_items_per_thread", 10);
@@ -915,7 +660,7 @@ public:
         return results_;
     }
 
-    std::vector<std::pair<std::string, std::string>> additional_properties() const override {
+    [[nodiscard]] std::vector<std::pair<std::string, std::string>> additional_properties() const override {
         return std::vector<std::pair<std::string, std::string>>{
             std::make_pair("scatter_threads_per_block", std::to_string(scatter_threads_per_block_)),
             std::make_pair("scatter_items_per_thread", std::to_string(scatter_items_per_thread_)),
@@ -1013,15 +758,25 @@ protected:
         CUCH(cudaFree(d_inputs_));
     }
 
-    std::vector<std::string> measurement_labels_impl() const override {
-        return this->measure_alg() ? labels : std::vector<std::string>{};
+    [[nodiscard]] std::vector<const char*> measurement_labels_impl() const override {
+        return this->measure_alg() ?
+               std::vector<const char*>(std::begin(labels), std::end(labels)) :
+               std::vector<const char*>{};
     }
 
 private:
     using fft_real_t = typename real_trait<T>::type;
     using fft_complex_t = typename complex_trait<T>::type;
 
-    static std::vector<std::string> labels;
+    inline static const char* labels[] = {
+        "Forward FFT",
+        "Hadamard",
+        "Inverse FFT",
+        "ToDevice",
+        "Scatter",
+        "Allocation",
+        "Plan"
+    };
 
     data_array<T, ALLOC> ref_;
     data_array<T, ALLOC> targets_;
@@ -1045,17 +800,5 @@ private:
     dsize_t hadamard_threads_per_block_;
 
 };
-
-template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
-std::vector<std::string> fft_reduced_transfer_one_to_many<T, BENCH_TYPE, ALLOC>::labels{
-    "Forward FFT",
-    "Hadamard",
-    "Inverse FFT",
-    "ToDevice",
-    "Scatter",
-    "Allocation",
-    "Plan"
-};
-
 
 }

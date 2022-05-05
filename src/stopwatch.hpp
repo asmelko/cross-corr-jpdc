@@ -38,7 +38,7 @@ public:
         return total_time_;
     }
 
-    std::size_t get_iterations() const {
+    [[nodiscard]] std::size_t get_iterations() const {
         return iterations_;
     }
 private:
@@ -209,7 +209,7 @@ public:
 
     }
 
-    std::size_t get_label() const {
+    [[nodiscard]] std::size_t get_label() const {
         return label_;
     }
 private:
@@ -245,11 +245,11 @@ public:
         CUCH(cudaEventRecord(stop_));
     }
 
-    cudaEvent_t get_start() const {
+    [[nodiscard]] cudaEvent_t get_start() const {
         return start_;
     }
 
-    cudaEvent_t get_stop() const {
+    [[nodiscard]] cudaEvent_t get_stop() const {
         return stop_;
     }
 private:
@@ -271,11 +271,11 @@ public:
         CUCH(cudaEventDestroy(start_));
     }
 
-    cudaEvent_t get_start() const {
+    [[nodiscard]] cudaEvent_t get_start() const {
         return start_;
     }
 
-    cudaEvent_t get_stop() const {
+    [[nodiscard]] cudaEvent_t get_stop() const {
         return stop_;
     }
 
@@ -283,11 +283,11 @@ public:
         iterations_ = iterations;
     }
 
-    bool is_used() const {
+    [[nodiscard]] bool is_used() const {
         return iterations_ != 0;
     }
 
-    std::size_t get_iterations() const {
+    [[nodiscard]] std::size_t get_iterations() const {
         return iterations_;
     }
 
@@ -313,7 +313,7 @@ public:
 
     }
 
-    std::chrono::nanoseconds get_min_time() const {
+    [[nodiscard]] std::chrono::nanoseconds get_min_time() const {
         return min_time_;
     }
 

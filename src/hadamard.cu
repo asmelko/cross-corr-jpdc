@@ -1,10 +1,6 @@
-#include <cuda.h>
-#include <cuda_runtime.h>
 #include <cufft.h>
 
 #include <cooperative_groups.h>
-#include <cooperative_groups/memcpy_async.h>
-#include <cooperative_groups/reduce.h>
 
 #include "types.cuh"
 #include "cuda_helpers.cuh"
