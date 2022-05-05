@@ -70,7 +70,7 @@ void run_ccn_warp_shuffle(
     dsize2_t matrix_size,
     dsize2_t search_size,
     dsize_t num_right_matrices,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t right_matrices_per_thread
 );
 
@@ -81,7 +81,7 @@ void run_ccn_warp_per_shift(
     RES* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_shifts_per_block
+    dsize_t shifts_per_thread_block
 );
 
 template<typename T, typename RES>
@@ -91,7 +91,7 @@ void run_ccn_warp_per_shift_simple_indexing(
     RES* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_shifts_per_block
+    dsize_t shifts_per_thread_block
 );
 
 template<typename DIST, typename T, typename RES>
@@ -101,7 +101,7 @@ void run_ccn_warp_per_shift_work_distribution(
     RES* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_shifts_per_block,
+    dsize_t shifts_per_thread_block,
     dsize_t max_rows_per_warp
 );
 
@@ -113,7 +113,7 @@ void run_ccn_warp_shuffle_work_distribution(
     dsize2_t matrix_size,
     dsize2_t search_size,
     dsize_t num_right_matrices,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread,
     cudaStream_t cuda_stream = nullptr
@@ -144,7 +144,7 @@ void run_ccn_shuffle_n_to_m_multimat_both_work_distribution(
     dsize2_t search_size,
     dsize_t num_left_matrices,
     dsize_t num_right_matrices,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t left_matrices_per_thread,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread
@@ -157,7 +157,7 @@ void run_ccn_shuffle_multirow_right(
     RES* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t right_rows_per_thread
 );
 
@@ -168,7 +168,7 @@ void run_ccn_shuffle_multirow_both(
     RES* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t max_shifts_per_thread,
     dsize_t max_left_rows
 );
@@ -191,7 +191,7 @@ void run_ccn_shuffle_multirow_right_multimat_right(
     dsize2_t matrix_size,
     dsize2_t search_size,
     dsize_t num_right_matrices,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t right_rows_per_thread,
     dsize_t right_matrices_per_thread
 );
@@ -237,7 +237,7 @@ void run_ccn_shuffle_n_to_m_multimat_both_work_distribution(
     dsize2_t search_size,
     dsize_t num_left_matrices,
     dsize_t num_right_matrices,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t left_matrices_per_thread,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread
@@ -250,7 +250,7 @@ void run_ccn_shuffle_multirow_both(
     RES* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t max_shifts_per_thread,
     dsize_t max_left_rows
 );

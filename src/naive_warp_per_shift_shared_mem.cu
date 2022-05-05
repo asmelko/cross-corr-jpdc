@@ -406,7 +406,7 @@ __global__ void ccn_warp_per_shift_shared_mem(
     cg::thread_block ctb = cg::this_thread_block();
     cg::thread_block_tile<warp_size> warp = cg::tiled_partition<warp_size>(ctb);
 
-    dsize_t shifts_per_block = warp.meta_group_size();
+    dsize_t shifts_per_thread_block = warp.meta_group_size();
     dsize2_t half_search_size = (search_size - 1) / 2;
 
     // Each warp computes the same shift in right_matrices_per_warp consecutive matrices
@@ -432,11 +432,11 @@ __global__ void ccn_warp_per_shift_shared_mem(
     int block_x_shift = static_cast<int>(output_x_offset) - half_search_size.x;
     // Shift of the first warp in the block
     int block_min_y_shift =
-        static_cast<int>(ctb.group_index().y * shifts_per_block) - static_cast<int>(half_search_size.y);
+        static_cast<int>(ctb.group_index().y * shifts_per_thread_block) - static_cast<int>(half_search_size.y);
     // Shift of the last warp in the block
     int block_max_y_shift =
         min(
-            static_cast<int>(ctb.group_index().y * shifts_per_block) + shifts_per_block - 1,
+            static_cast<int>(ctb.group_index().y * shifts_per_thread_block) + shifts_per_thread_block - 1,
             static_cast<int>(search_size.y)
         ) -
         static_cast<int>(half_search_size.y);
@@ -463,7 +463,7 @@ __global__ void ccn_warp_per_shift_shared_mem(
 
     dsize2_t warp_out_pos{
         output_x_offset,
-        ctb.group_index().y * shifts_per_block + warp.meta_group_rank()
+        ctb.group_index().y * shifts_per_thread_block + warp.meta_group_rank()
     };
 
     auto args = create_shared_mem_rows_impl_args(

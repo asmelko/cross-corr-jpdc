@@ -176,7 +176,7 @@ public:
     explicit naive_warp_shuffle_one_to_many(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_many<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), targets_(), results_()
     {
-        rows_per_block_ = args.value("rows_per_block", 8);
+        warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
         right_matrices_per_thread_ = args.value("right_matrices_per_thread", 2);
     }
 
@@ -194,7 +194,7 @@ public:
 
     std::vector<std::pair<std::string, std::string>> additional_properties() const override {
         return std::vector<std::pair<std::string, std::string>>{
-            std::make_pair("rows_per_block", std::to_string(rows_per_block_)),
+            std::make_pair("warps_per_thread_block", std::to_string(warps_per_thread_block_)),
             std::make_pair("right_matrices_per_thread", std::to_string(right_matrices_per_thread_))
         };
     }
@@ -229,7 +229,7 @@ protected:
                          targets_.matrix_size(),
                          results_.matrix_size(),
                          targets_.num_matrices(),
-                         rows_per_block_,
+                         warps_per_thread_block_,
                          right_matrices_per_thread_
                      )
         );
@@ -262,7 +262,7 @@ private:
     T* d_targets_;
     T* d_results_;
 
-    dsize_t rows_per_block_;
+    dsize_t warps_per_thread_block_;
     dsize_t right_matrices_per_thread_;
 };
 
@@ -277,7 +277,7 @@ public:
     explicit naive_warp_shuffle_work_distribution_one_to_many(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_many<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), targets_(), results_()
     {
-        block_y_size_ = args.value("block_y_size", 8);
+        warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
         right_matrices_per_thread_ = args.value("right_matrices_per_thread", 2);
         rows_per_thread_ = args.value("rows_per_thread", 10);
         distribution_type_ = from_string(args.value("distribution_type", "rectangle"));
@@ -297,7 +297,7 @@ public:
 
     std::vector<std::pair<std::string, std::string>> additional_properties() const override {
         return std::vector<std::pair<std::string, std::string>>{
-            std::make_pair("block_y_size", std::to_string(block_y_size_)),
+            std::make_pair("warps_per_thread_block", std::to_string(warps_per_thread_block_)),
             std::make_pair("right_matrices_per_thread", std::to_string(right_matrices_per_thread_)),
             std::make_pair("rows_per_thread", std::to_string(rows_per_thread_)),
             std::make_pair("distribution_type", to_string(distribution_type_))
@@ -366,7 +366,7 @@ private:
     T* d_targets_;
     T* d_results_;
 
-    dsize_t block_y_size_;
+    dsize_t warps_per_thread_block_;
     dsize_t right_matrices_per_thread_;
     dsize_t rows_per_thread_;
     distribution distribution_type_;
@@ -384,7 +384,7 @@ private:
                 targets_.matrix_size(),
                 results_.matrix_size(),
                 targets_.num_matrices(),
-                block_y_size_,
+                warps_per_thread_block_,
                 right_matrices_per_thread_,
                 rows_per_thread_
             )
@@ -403,7 +403,7 @@ public:
     explicit naive_shuffle_multirow_right_multimat_right_one_to_many(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_many<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), targets_(), results_()
     {
-        rows_per_block_ = args.value("rows_per_block", 8);
+        warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
         right_rows_per_thread_ = args.value("right_rows_per_thread", 4);
         right_matrices_per_thread_ = args.value("right_matrices_per_thread", 4);
     }
@@ -422,7 +422,7 @@ public:
 
     std::vector<std::pair<std::string, std::string>> additional_properties() const override {
         return std::vector<std::pair<std::string, std::string>>{
-            std::make_pair("rows_per_block", std::to_string(rows_per_block_)),
+            std::make_pair("warps_per_thread_block", std::to_string(warps_per_thread_block_)),
             std::make_pair("right_rows_per_thread", std::to_string(right_rows_per_thread_)),
             std::make_pair("right_matrices_per_thread", std::to_string(right_matrices_per_thread_))
         };
@@ -458,7 +458,7 @@ protected:
                                   targets_.matrix_size(),
                                   results_.matrix_size(),
                                   targets_.num_matrices(),
-                                  rows_per_block_,
+                                  warps_per_thread_block_,
                                   right_rows_per_thread_,
                                   right_matrices_per_thread_
                               )
@@ -492,7 +492,7 @@ private:
     T* d_targets_;
     T* d_results_;
 
-    dsize_t rows_per_block_;
+    dsize_t warps_per_thread_block_;
     dsize_t right_rows_per_thread_;
     dsize_t right_matrices_per_thread_;
 };
@@ -618,24 +618,24 @@ public:
     explicit naive_warp_per_shift_shared_mem_one_to_many(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_many<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), targets_(), results_()
     {
-        shifts_per_block_ = args.value(SHIFTS_PER_BLOCK_ARG, 8);
+        shifts_per_thread_block_ = args.value(SHIFTS_PER_THREAD_BLOCK_ARG, 16);
         shared_mem_row_size_ = args.value(SHARED_MEM_ROW_SIZE_ARG, 32);
-        shared_mem_rows_ = args.value(SHARED_MEM_ROWS_ARG, shifts_per_block_);
+        shared_mem_rows_ = args.value(SHARED_MEM_ROWS_ARG, shifts_per_thread_block_);
         strided_load_ = args.value(STRIDED_LOAD_ARG, true);
         column_group_per_block_ = args.value(COLUMN_GROUP_PER_BLOCK_ARG, false);
         right_matrices_per_block_ = args.value(RIGHT_MATRICES_PER_BLOCK_ARG, 8);
 
         if (shared_mem_rows_ == 0) {
-            shared_mem_rows_ = shifts_per_block_;
+            shared_mem_rows_ = shifts_per_thread_block_;
         }
 
         // TODO: Remove this if we change the implementation to work with fewer
         //  shared mem rows than shifts per block
-        if (shared_mem_rows_ < shifts_per_block_) {
+        if (shared_mem_rows_ < shifts_per_thread_block_) {
             throw argument_error("Invalid number of shared memory rows ["s +
                                      std::to_string(shared_mem_rows_) +
                                      "], must be greater than shifts per block [" +
-                                     std::to_string(shifts_per_block_) +
+                                     std::to_string(shifts_per_thread_block_) +
                                      "]",
                                      SHARED_MEM_ROWS_ARG);
         }
@@ -655,7 +655,7 @@ public:
 
     std::vector<std::pair<std::string, std::string>> additional_properties() const override {
         return std::vector<std::pair<std::string, std::string>>{
-            std::make_pair(SHIFTS_PER_BLOCK_ARG, std::to_string(shifts_per_block_)),
+            std::make_pair(SHIFTS_PER_THREAD_BLOCK_ARG, std::to_string(shifts_per_thread_block_)),
             std::make_pair(SHARED_MEM_ROW_SIZE_ARG, std::to_string(shared_mem_row_size_)),
             std::make_pair(SHARED_MEM_ROWS_ARG, std::to_string(shared_mem_rows_)),
             std::make_pair(STRIDED_LOAD_ARG, std::to_string(strided_load_)),
@@ -699,7 +699,7 @@ protected:
                          targets_.matrix_size(),
                          results_.matrix_size(),
                          targets_.num_matrices(),
-                         shifts_per_block_,
+                         shifts_per_thread_block_,
                          shared_mem_row_size_,
                          shared_mem_rows_,
                          right_matrices_per_block_,
@@ -727,7 +727,7 @@ private:
 
     static std::vector<std::string> labels;
 
-    inline static const std::string SHIFTS_PER_BLOCK_ARG = "shifts_per_block";
+    inline static const std::string SHIFTS_PER_THREAD_BLOCK_ARG = "shifts_per_thread_block";
     inline static const std::string SHARED_MEM_ROW_SIZE_ARG = "shared_mem_row_size";
     inline static const std::string SHARED_MEM_ROWS_ARG = "shared_mem_rows";
     inline static const std::string STRIDED_LOAD_ARG = "strided_load";
@@ -743,7 +743,7 @@ private:
     T* d_targets_;
     T* d_results_;
 
-    dsize_t shifts_per_block_;
+    dsize_t shifts_per_thread_block_;
     dsize_t shared_mem_row_size_;
     dsize_t shared_mem_rows_;
     dsize_t right_matrices_per_block_;

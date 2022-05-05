@@ -486,12 +486,12 @@ __host__ void ccn_shuffle_multirow_right_dispatch(
     RES* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t right_rows_per_thread
 ) {
     if constexpr(MAX_RIGHT_ROWS_PER_THREAD > 0) {
         if (MAX_RIGHT_ROWS_PER_THREAD == right_rows_per_thread) {
-            dim3 num_threads(warp_size, cuda_rows_per_block);
+            dim3 num_threads(warp_size, warps_per_thread_block);
             dim3 num_blocks(
                 div_up(search_size.x, num_threads.x),
                 div_up(search_size.y, num_threads.y * MAX_RIGHT_ROWS_PER_THREAD)
@@ -513,7 +513,7 @@ __host__ void ccn_shuffle_multirow_right_dispatch(
                 out,
                 matrix_size,
                 search_size,
-                cuda_rows_per_block,
+                warps_per_thread_block,
                 right_rows_per_thread
             );
         }
@@ -526,7 +526,7 @@ __host__ void ccn_shuffle_multirow_right_dispatch(
         (void)out;
         (void)matrix_size;
         (void)search_size;
-        (void)cuda_rows_per_block;
+        (void)warps_per_thread_block;
         (void)right_rows_per_thread;
         assert(false);
     }
@@ -541,11 +541,11 @@ void run_ccn_shuffle_multirow_right(
     RES* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t right_rows_per_thread
 ) {
-    if (cuda_rows_per_block > 32) {
-        throw std::runtime_error("Too many rows per block: "s + std::to_string(cuda_rows_per_block) + " (max 32)");
+    if (warps_per_thread_block > 32) {
+        throw std::runtime_error("Too many warps per thread block: "s + std::to_string(warps_per_thread_block) + " (max 32)");
     }
 
     if (right_rows_per_thread > right_rows_limit) {
@@ -563,7 +563,7 @@ void run_ccn_shuffle_multirow_right(
         out,
         matrix_size,
         search_size,
-        cuda_rows_per_block,
+        warps_per_thread_block,
         right_rows_per_thread
     );
 }
@@ -574,7 +574,7 @@ template void run_ccn_shuffle_multirow_right<int, int>(
         int* __restrict__ out,
         dsize2_t matrix_size,
         dsize2_t search_size,
-        dsize_t cuda_rows_per_block,
+        dsize_t warps_per_thread_block,
         dsize_t right_rows_per_thread
 );
 
@@ -584,7 +584,7 @@ template void run_ccn_shuffle_multirow_right<float, float>(
         float* __restrict__ out,
         dsize2_t matrix_size,
         dsize2_t search_size,
-        dsize_t cuda_rows_per_block,
+        dsize_t warps_per_thread_block,
         dsize_t right_rows_per_thread
 );
 
@@ -594,7 +594,7 @@ template void run_ccn_shuffle_multirow_right<double, double>(
         double* __restrict__ out,
         dsize2_t matrix_size,
         dsize2_t search_size,
-        dsize_t cuda_rows_per_block,
+        dsize_t warps_per_thread_block,
         dsize_t right_rows_per_thread
 );
 

@@ -441,7 +441,7 @@ __host__ void ccn_shuffle_n_to_m_multimat_both_work_distribution_right_mat_dispa
     dsize2_t search_size,
     dsize_t num_left_matrices,
     dsize_t num_right_matrices,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread
 ) {
@@ -459,7 +459,7 @@ __host__ void ccn_shuffle_n_to_m_multimat_both_work_distribution_right_mat_dispa
             // as there are shifts, in each matrix group
             dsize_t blocks_per_matrix_group = div_up(search_size.x, block_x_size);
 
-            dim3 num_threads(block_x_size, cuda_rows_per_block);
+            dim3 num_threads(block_x_size, warps_per_thread_block);
             dim3 num_blocks(
                 // Encodes the shift in x direction and the left matrix group the thread belongs to
                 blocks_per_matrix_group * num_left_matrix_groups,
@@ -488,7 +488,7 @@ __host__ void ccn_shuffle_n_to_m_multimat_both_work_distribution_right_mat_dispa
                 search_size,
                 num_left_matrices,
                 num_right_matrices,
-                cuda_rows_per_block,
+                warps_per_thread_block,
                 right_matrices_per_thread,
                 max_rows_per_thread
             );
@@ -504,7 +504,7 @@ __host__ void ccn_shuffle_n_to_m_multimat_both_work_distribution_right_mat_dispa
         (void)search_size;
         (void)num_left_matrices;
         (void)num_right_matrices;
-        (void)cuda_rows_per_block;
+        (void)warps_per_thread_block;
         (void)right_matrices_per_thread;
         (void)max_rows_per_thread;
         assert(false);
@@ -520,7 +520,7 @@ __host__ void ccn_shuffle_n_to_m_multimat_both_work_distribution_left_mat_dispat
     dsize2_t search_size,
     dsize_t num_left_matrices,
     dsize_t num_right_matrices,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t left_matrices_per_thread,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread
@@ -535,7 +535,7 @@ __host__ void ccn_shuffle_n_to_m_multimat_both_work_distribution_left_mat_dispat
                 search_size,
                 num_left_matrices,
                 num_right_matrices,
-                cuda_rows_per_block,
+                warps_per_thread_block,
                 right_matrices_per_thread,
                 max_rows_per_thread
             );
@@ -548,7 +548,7 @@ __host__ void ccn_shuffle_n_to_m_multimat_both_work_distribution_left_mat_dispat
                 search_size,
                 num_left_matrices,
                 num_right_matrices,
-                cuda_rows_per_block,
+                warps_per_thread_block,
                 left_matrices_per_thread,
                 right_matrices_per_thread,
                 max_rows_per_thread
@@ -565,7 +565,7 @@ __host__ void ccn_shuffle_n_to_m_multimat_both_work_distribution_left_mat_dispat
         (void)search_size;
         (void)num_left_matrices;
         (void)num_right_matrices;
-        (void)cuda_rows_per_block;
+        (void)warps_per_thread_block;
         (void)left_matrices_per_thread;
         (void)right_matrices_per_thread;
         (void)max_rows_per_thread;
@@ -585,13 +585,13 @@ void run_ccn_shuffle_n_to_m_multimat_both_work_distribution(
     dsize2_t search_size,
     dsize_t num_left_matrices,
     dsize_t num_right_matrices,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t left_matrices_per_thread,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread
 ) {
-    if (cuda_rows_per_block > 32) {
-        throw std::runtime_error("Too many rows per block: "s + std::to_string(cuda_rows_per_block) + " (max 32)");
+    if (warps_per_thread_block > 32) {
+        throw std::runtime_error("Too many warps per thread block: "s + std::to_string(warps_per_thread_block) + " (max 32)");
     }
 
     if (left_matrices_per_thread > left_matrices_per_thread_limit) {
@@ -620,7 +620,7 @@ void run_ccn_shuffle_n_to_m_multimat_both_work_distribution(
         search_size,
         num_left_matrices,
         num_right_matrices,
-        cuda_rows_per_block,
+        warps_per_thread_block,
         left_matrices_per_thread,
         right_matrices_per_thread,
         max_rows_per_thread
@@ -635,7 +635,7 @@ template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<triangle_di
     dsize2_t search_size,
     dsize_t num_left_matrices,
     dsize_t num_right_matrices,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t left_matrices_per_thread,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread
@@ -649,7 +649,7 @@ template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<triangle_di
     dsize2_t search_size,
     dsize_t num_left_matrices,
     dsize_t num_right_matrices,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t left_matrices_per_thread,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread
@@ -663,7 +663,7 @@ template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<triangle_di
     dsize2_t search_size,
     dsize_t num_left_matrices,
     dsize_t num_right_matrices,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t left_matrices_per_thread,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread
@@ -677,7 +677,7 @@ template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<rectangle_d
     dsize2_t search_size,
     dsize_t num_left_matrices,
     dsize_t num_right_matrices,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t left_matrices_per_thread,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread
@@ -691,7 +691,7 @@ template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<rectangle_d
     dsize2_t search_size,
     dsize_t num_left_matrices,
     dsize_t num_right_matrices,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t left_matrices_per_thread,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread
@@ -705,7 +705,7 @@ template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<rectangle_d
     dsize2_t search_size,
     dsize_t num_left_matrices,
     dsize_t num_right_matrices,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t left_matrices_per_thread,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread
@@ -719,7 +719,7 @@ template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<no_distribu
     dsize2_t search_size,
     dsize_t num_left_matrices,
     dsize_t num_right_matrices,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t left_matrices_per_thread,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread
@@ -733,7 +733,7 @@ template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<no_distribu
     dsize2_t search_size,
     dsize_t num_left_matrices,
     dsize_t num_right_matrices,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t left_matrices_per_thread,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread
@@ -747,7 +747,7 @@ template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<no_distribu
     dsize2_t search_size,
     dsize_t num_left_matrices,
     dsize_t num_right_matrices,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t left_matrices_per_thread,
     dsize_t right_matrices_per_thread,
     dsize_t max_rows_per_thread

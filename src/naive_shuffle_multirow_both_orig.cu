@@ -539,12 +539,12 @@ __host__ void ccn_shuffle_multirow_both_left_rows_dispatch(
     RES* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t max_left_rows
 ) {
     if constexpr(MAX_LEFT_ROWS > 0) {
         if (MAX_LEFT_ROWS == max_left_rows) {
-            dim3 num_threads(warp_size, cuda_rows_per_block);
+            dim3 num_threads(warp_size, warps_per_thread_block);
             dim3 num_blocks(
                 div_up(search_size.x, num_threads.x),
                 div_up(search_size.y, num_threads.y * MAX_SHIFTS_PER_THREAD)
@@ -567,7 +567,7 @@ __host__ void ccn_shuffle_multirow_both_left_rows_dispatch(
                 out,
                 matrix_size,
                 search_size,
-                cuda_rows_per_block,
+                warps_per_thread_block,
                 max_left_rows
             );
         }
@@ -580,7 +580,7 @@ __host__ void ccn_shuffle_multirow_both_left_rows_dispatch(
         (void)out;
         (void)matrix_size;
         (void)search_size;
-        (void)cuda_rows_per_block;
+        (void)warps_per_thread_block;
         (void)max_left_rows;
         assert(false);
     }
@@ -593,7 +593,7 @@ __host__ void ccn_shuffle_multirow_both_shifts_dispatch(
     RES* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t max_shifts_per_thread,
     dsize_t max_left_rows
 ) {
@@ -605,7 +605,7 @@ __host__ void ccn_shuffle_multirow_both_shifts_dispatch(
                 out,
                 matrix_size,
                 search_size,
-                cuda_rows_per_block,
+                warps_per_thread_block,
                 max_left_rows
             );
         } else {
@@ -615,7 +615,7 @@ __host__ void ccn_shuffle_multirow_both_shifts_dispatch(
                 out,
                 matrix_size,
                 search_size,
-                cuda_rows_per_block,
+                warps_per_thread_block,
                 max_shifts_per_thread,
                 max_left_rows
             );
@@ -629,7 +629,7 @@ __host__ void ccn_shuffle_multirow_both_shifts_dispatch(
         (void)out;
         (void)matrix_size;
         (void)search_size;
-        (void)cuda_rows_per_block;
+        (void)warps_per_thread_block;
         (void)max_shifts_per_thread;
         (void)max_left_rows;
         assert(false);
@@ -645,12 +645,12 @@ void run_ccn_shuffle_multirow_both(
     RES* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_rows_per_block,
+    dsize_t warps_per_thread_block,
     dsize_t max_shifts_per_thread,
     dsize_t max_left_rows
 ) {
-    if (cuda_rows_per_block > 32) {
-        throw std::runtime_error("Too many rows per block: "s + std::to_string(cuda_rows_per_block) + " (max 32)");
+    if (warps_per_thread_block > 32) {
+        throw std::runtime_error("Too many warps per thread block: "s + std::to_string(warps_per_thread_block) + " (max 32)");
     }
 
     if (max_shifts_per_thread > shifts_per_thread_limit) {
@@ -677,7 +677,7 @@ void run_ccn_shuffle_multirow_both(
         out,
         matrix_size,
         search_size,
-        cuda_rows_per_block,
+        warps_per_thread_block,
         max_shifts_per_thread,
         max_left_rows
     );
@@ -689,7 +689,7 @@ template void run_ccn_shuffle_multirow_both<int, int>(
         int* __restrict__ out,
         dsize2_t matrix_size,
         dsize2_t search_size,
-        dsize_t cuda_rows_per_block,
+        dsize_t warps_per_thread_block,
         dsize_t max_shifts_per_thread,
         dsize_t max_left_rows
 );
@@ -700,7 +700,7 @@ template void run_ccn_shuffle_multirow_both<float, float>(
         float* __restrict__ out,
         dsize2_t matrix_size,
         dsize2_t search_size,
-        dsize_t cuda_rows_per_block,
+        dsize_t warps_per_thread_block,
         dsize_t max_shifts_per_thread,
         dsize_t max_left_rows
 );
@@ -711,7 +711,7 @@ template void run_ccn_shuffle_multirow_both<double, double>(
         double* __restrict__ out,
         dsize2_t matrix_size,
         dsize2_t search_size,
-        dsize_t cuda_rows_per_block,
+        dsize_t warps_per_thread_block,
         dsize_t max_shifts_per_thread,
         dsize_t max_left_rows
 );

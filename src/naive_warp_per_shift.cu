@@ -32,10 +32,10 @@ __global__ void ccn_warp_per_shift(
     cg::thread_block ctb = cg::this_thread_block();
     cg::thread_block_tile<warp_size> warp = cg::tiled_partition<warp_size>(ctb);
 
-    dsize_t shifts_per_block = ctb.group_dim().y;
+    dsize_t shifts_per_thread_block = ctb.group_dim().y;
 
     dsize2_t warp_out_pos{
-        ctb.thread_index().y + ctb.group_index().x * shifts_per_block,
+        ctb.thread_index().y + ctb.group_index().x * shifts_per_thread_block,
         ctb.group_index().y
     };
 
@@ -111,7 +111,7 @@ __global__ void ccn_warp_per_shift_work_distribution(
     cg::thread_block ctb = cg::this_thread_block();
     cg::thread_block_tile<warp_size> warp = cg::tiled_partition<warp_size>(ctb);
 
-    dsize_t shifts_per_block = ctb.group_dim().y;
+    dsize_t shifts_per_thread_block = ctb.group_dim().y;
 
     // Distribute rows of a single shift between multiple workers,
     // in this case warps
@@ -126,7 +126,7 @@ __global__ void ccn_warp_per_shift_work_distribution(
     );
 
     dsize2_t warp_out_pos{
-        ctb.thread_index().y + ctb.group_index().x * shifts_per_block,
+        ctb.thread_index().y + ctb.group_index().x * shifts_per_thread_block,
         work.output_row
     };
 
@@ -202,10 +202,10 @@ __global__ void ccn_warp_per_shift_simple_indexing(
     cg::thread_block ctb = cg::this_thread_block();
     cg::thread_block_tile<warp_size> warp = cg::tiled_partition<warp_size>(ctb);
 
-    dsize_t shifts_per_block = ctb.group_dim().y;
+    dsize_t shifts_per_thread_block = ctb.group_dim().y;
 
     dsize2_t warp_out_pos{
-        ctb.thread_index().y + ctb.group_index().x * shifts_per_block,
+        ctb.thread_index().y + ctb.group_index().x * shifts_per_thread_block,
         ctb.group_index().y
     };
 
@@ -255,13 +255,13 @@ void run_ccn_warp_per_shift(
     RES* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_shifts_per_block
+    dsize_t shifts_per_thread_block
 ) {
-    if (cuda_shifts_per_block > 32) {
-        throw std::runtime_error("Too many shifts per block: "s + std::to_string(cuda_shifts_per_block) + " (max 32)");
+    if (shifts_per_thread_block > 32) {
+        throw std::runtime_error("Too many shifts per thread block: "s + std::to_string(shifts_per_thread_block) + " (max 32)");
     }
 
-    dim3 num_threads(warp_size, cuda_shifts_per_block);
+    dim3 num_threads(warp_size, shifts_per_thread_block);
     dim3 num_blocks(
         div_up(search_size.x, num_threads.y),
         search_size.y
@@ -283,16 +283,16 @@ void run_ccn_warp_per_shift_work_distribution(
     RES* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_shifts_per_block,
+    dsize_t shifts_per_thread_block,
     dsize_t max_rows_per_warp
 ) {
-    if (cuda_shifts_per_block > 32) {
-        throw std::runtime_error("Too many shifts per block: "s + std::to_string(cuda_shifts_per_block) + " (max 32)");
+    if (shifts_per_thread_block > 32) {
+        throw std::runtime_error("Too many shifts per thread block: "s + std::to_string(shifts_per_thread_block) + " (max 32)");
     }
 
     dsize_t num_workers = DIST::num_workers(max_rows_per_warp, matrix_size.y, search_size.y);
 
-    dim3 num_threads(warp_size, cuda_shifts_per_block);
+    dim3 num_threads(warp_size, shifts_per_thread_block);
     dim3 num_blocks(
         div_up(search_size.x, num_threads.y),
         num_workers
@@ -315,13 +315,13 @@ void run_ccn_warp_per_shift_simple_indexing(
     RES* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_shifts_per_block
+    dsize_t shifts_per_thread_block
 ) {
-    if (cuda_shifts_per_block > 32) {
-        throw std::runtime_error("Too many shifts per block: "s + std::to_string(cuda_shifts_per_block) + " (max 32)");
+    if (shifts_per_thread_block > 32) {
+        throw std::runtime_error("Too many shifts per thread block: "s + std::to_string(shifts_per_thread_block) + " (max 32)");
     }
 
-    dim3 num_threads(warp_size, cuda_shifts_per_block);
+    dim3 num_threads(warp_size, shifts_per_thread_block);
     dim3 num_blocks(
         div_up(search_size.x, num_threads.y),
         search_size.y
@@ -342,7 +342,7 @@ template void run_ccn_warp_per_shift<int, int>(
     int* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_shifts_per_block
+    dsize_t shifts_per_thread_block
 );
 
 template void run_ccn_warp_per_shift<float, float>(
@@ -351,7 +351,7 @@ template void run_ccn_warp_per_shift<float, float>(
     float* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_shifts_per_block
+    dsize_t shifts_per_thread_block
 );
 
 template void run_ccn_warp_per_shift<double, double>(
@@ -360,7 +360,7 @@ template void run_ccn_warp_per_shift<double, double>(
     double* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_shifts_per_block
+    dsize_t shifts_per_thread_block
 );
 
 template void run_ccn_warp_per_shift_simple_indexing<int, int>(
@@ -369,7 +369,7 @@ template void run_ccn_warp_per_shift_simple_indexing<int, int>(
     int* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_shifts_per_block
+    dsize_t shifts_per_thread_block
 );
 
 template void run_ccn_warp_per_shift_simple_indexing<float, float>(
@@ -378,7 +378,7 @@ template void run_ccn_warp_per_shift_simple_indexing<float, float>(
     float* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_shifts_per_block
+    dsize_t shifts_per_thread_block
 );
 
 template void run_ccn_warp_per_shift_simple_indexing<double, double>(
@@ -387,7 +387,7 @@ template void run_ccn_warp_per_shift_simple_indexing<double, double>(
     double* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_shifts_per_block
+    dsize_t shifts_per_thread_block
 );
 
 template void run_ccn_warp_per_shift_work_distribution<triangle_distribution, int, int>(
@@ -396,7 +396,7 @@ template void run_ccn_warp_per_shift_work_distribution<triangle_distribution, in
     int* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_shifts_per_block,
+    dsize_t shifts_per_thread_block,
     dsize_t max_rows_per_warp
 );
 
@@ -406,7 +406,7 @@ template void run_ccn_warp_per_shift_work_distribution<triangle_distribution, fl
     float* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_shifts_per_block,
+    dsize_t shifts_per_thread_block,
     dsize_t max_rows_per_warp
 );
 
@@ -416,7 +416,7 @@ template void run_ccn_warp_per_shift_work_distribution<triangle_distribution, do
     double* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_shifts_per_block,
+    dsize_t shifts_per_thread_block,
     dsize_t max_rows_per_warp
 );
 
@@ -426,7 +426,7 @@ template void run_ccn_warp_per_shift_work_distribution<rectangle_distribution, i
     int* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_shifts_per_block,
+    dsize_t shifts_per_thread_block,
     dsize_t max_rows_per_warp
 );
 
@@ -436,7 +436,7 @@ template void run_ccn_warp_per_shift_work_distribution<rectangle_distribution, f
     float* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_shifts_per_block,
+    dsize_t shifts_per_thread_block,
     dsize_t max_rows_per_warp
 );
 
@@ -446,7 +446,7 @@ template void run_ccn_warp_per_shift_work_distribution<rectangle_distribution, d
     double* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_shifts_per_block,
+    dsize_t shifts_per_thread_block,
     dsize_t max_rows_per_warp
 );
 
@@ -456,7 +456,7 @@ template void run_ccn_warp_per_shift_work_distribution<no_distribution, int, int
     int* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_shifts_per_block,
+    dsize_t shifts_per_thread_block,
     dsize_t max_rows_per_warp
 );
 
@@ -466,7 +466,7 @@ template void run_ccn_warp_per_shift_work_distribution<no_distribution, float, f
     float* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_shifts_per_block,
+    dsize_t shifts_per_thread_block,
     dsize_t max_rows_per_warp
 );
 
@@ -476,7 +476,7 @@ template void run_ccn_warp_per_shift_work_distribution<no_distribution, double, 
     double* __restrict__ out,
     dsize2_t matrix_size,
     dsize2_t search_size,
-    dsize_t cuda_shifts_per_block,
+    dsize_t shifts_per_thread_block,
     dsize_t max_rows_per_warp
 );
 

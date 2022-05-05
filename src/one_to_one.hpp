@@ -186,7 +186,7 @@ public:
     explicit naive_warp_shuffle_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_one<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), target_(), result_()
     {
-        block_y_size_ = args.value("block_y_size", 8);
+        warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
     }
 
     const data_array<T, ALLOC>& refs() const override {
@@ -203,7 +203,7 @@ public:
 
     std::vector<std::pair<std::string, std::string>> additional_properties() const override {
         return std::vector<std::pair<std::string, std::string>>{
-                std::make_pair("block_y_size", std::to_string(block_y_size_))
+                std::make_pair("warps_per_thread_block", std::to_string(warps_per_thread_block_))
         };
     }
 
@@ -237,7 +237,7 @@ protected:
                              target_.matrix_size(),
                              result_.matrix_size(),
                              1,
-                             block_y_size_,
+                             warps_per_thread_block_,
                              1
                      )
         );
@@ -270,7 +270,7 @@ private:
     T* d_target_;
     T* d_result_;
 
-    dsize_t block_y_size_;
+    dsize_t warps_per_thread_block_;
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
@@ -284,7 +284,7 @@ public:
     explicit naive_warp_shuffle_work_distribution_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_one<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), target_(), result_()
     {
-        block_y_size_ = args.value("block_y_size", 8);
+        warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
         rows_per_thread_ = args.value("rows_per_thread", 10);
         distribution_type_ = from_string(args.value("distribution_type", "rectangle"));
     }
@@ -303,7 +303,7 @@ public:
 
     std::vector<std::pair<std::string, std::string>> additional_properties() const override {
         return std::vector<std::pair<std::string, std::string>>{
-            std::make_pair("block_y_size", std::to_string(block_y_size_)),
+            std::make_pair("warps_per_thread_block", std::to_string(warps_per_thread_block_)),
             std::make_pair("rows_per_thread", std::to_string(rows_per_thread_)),
             std::make_pair("distribution_type", to_string(distribution_type_))
         };
@@ -371,7 +371,7 @@ private:
     T* d_target_;
     T* d_result_;
 
-    dsize_t block_y_size_;
+    dsize_t warps_per_thread_block_;
     dsize_t rows_per_thread_;
     distribution distribution_type_;
 
@@ -388,7 +388,7 @@ private:
                 target_.matrix_size(),
                 result_.matrix_size(),
                 1,
-                block_y_size_,
+                warps_per_thread_block_,
                 1,
                 rows_per_thread_
             )
@@ -407,7 +407,7 @@ public:
     explicit naive_warp_per_shift_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_one<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), target_(), result_()
     {
-        shifts_per_block_ = args.value("shifts_per_block", 8);
+        shifts_per_thread_block_ = args.value("shifts_per_thread_block", 8);
     }
 
     const data_array<T, ALLOC>& refs() const override {
@@ -424,7 +424,7 @@ public:
 
     std::vector<std::pair<std::string, std::string>> additional_properties() const override {
         return std::vector<std::pair<std::string, std::string>>{
-            std::make_pair("shifts_per_block", std::to_string(shifts_per_block_))
+            std::make_pair("shifts_per_thread_block", std::to_string(shifts_per_thread_block_))
         };
     }
 
@@ -457,7 +457,7 @@ protected:
                          d_result_,
                          target_.matrix_size(),
                          result_.matrix_size(),
-                         shifts_per_block_
+                         shifts_per_thread_block_
                      )
         );
     }
@@ -489,7 +489,7 @@ private:
     T* d_target_;
     T* d_result_;
 
-    dsize_t shifts_per_block_;
+    dsize_t shifts_per_thread_block_;
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
@@ -503,7 +503,7 @@ public:
     explicit naive_warp_per_shift_work_distribution_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_one<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), target_(), result_()
     {
-        shifts_per_block_ = args.value("shifts_per_block", 8);
+        shifts_per_thread_block_ = args.value("shifts_per_thread_block", 8);
         rows_per_warp_ = args.value("rows_per_warp", 3);
         distribution_type_ = from_string(args.value("distribution_type", "rectangle"));
     }
@@ -522,7 +522,7 @@ public:
 
     std::vector<std::pair<std::string, std::string>> additional_properties() const override {
         return std::vector<std::pair<std::string, std::string>>{
-            std::make_pair("shifts_per_block", std::to_string(shifts_per_block_)),
+            std::make_pair("shifts_per_thread_block", std::to_string(shifts_per_thread_block_)),
             std::make_pair("rows_per_warp", std::to_string(rows_per_warp_)),
             std::make_pair("distribution_type", to_string(distribution_type_))
         };
@@ -589,7 +589,7 @@ private:
     T* d_target_;
     T* d_result_;
 
-    dsize_t shifts_per_block_;
+    dsize_t shifts_per_thread_block_;
     dsize_t rows_per_warp_;
     distribution distribution_type_;
 
@@ -605,7 +605,7 @@ private:
                 d_result_,
                 target_.matrix_size(),
                 result_.matrix_size(),
-                shifts_per_block_,
+                shifts_per_thread_block_,
                 rows_per_warp_
             )
         );
@@ -624,7 +624,7 @@ public:
     explicit naive_warp_per_shift_simple_indexing_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_one<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), target_(), result_()
     {
-        shifts_per_block_ = args.value("shifts_per_block", 8);
+        shifts_per_thread_block_ = args.value("shifts_per_thread_block", 8);
     }
 
     const data_array<T, ALLOC>& refs() const override {
@@ -641,7 +641,7 @@ public:
 
     std::vector<std::pair<std::string, std::string>> additional_properties() const override {
         return std::vector<std::pair<std::string, std::string>>{
-            std::make_pair("shifts_per_block", std::to_string(shifts_per_block_))
+            std::make_pair("shifts_per_thread_block", std::to_string(shifts_per_thread_block_))
         };
     }
 
@@ -674,7 +674,7 @@ protected:
                          d_result_,
                          target_.matrix_size(),
                          result_.matrix_size(),
-                         shifts_per_block_
+                         shifts_per_thread_block_
                      )
         );
     }
@@ -706,7 +706,7 @@ private:
     T* d_target_;
     T* d_result_;
 
-    dsize_t shifts_per_block_;
+    dsize_t shifts_per_thread_block_;
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC>
@@ -721,26 +721,24 @@ public:
     explicit naive_warp_per_shift_shared_mem_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_one<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), target_(), result_()
     {
-        // These arguments DO NOT WORK with DEBUG build, as unoptimized kernel requires too many registers
-        // TODO: Change back to this, as it is the most performant
-        // shifts_per_block_ = args.value(SHIFTS_PER_BLOCK_ARG, 32);
-        shifts_per_block_ = args.value(SHIFTS_PER_BLOCK_ARG, 16);
-        shared_mem_row_size_ = args.value(SHARED_MEM_ROW_SIZE_ARG, 128);
-        shared_mem_rows_ = args.value(SHARED_MEM_ROWS_ARG, shifts_per_block_);
+        // These arguments MAY NOT WORK with DEBUG build, as unoptimized kernel requires too many registers
+        shifts_per_thread_block_ = args.value(SHIFTS_PER_THREAD_BLOCK_ARG, 32);
+        shared_mem_row_size_ = args.value(SHARED_MEM_ROW_SIZE_ARG, 32);
+        shared_mem_rows_ = args.value(SHARED_MEM_ROWS_ARG, shifts_per_thread_block_);
         strided_load_ = args.value(STRIDED_LOAD_ARG, true);
         column_group_per_block_ = args.value(COLUMN_GROUP_PER_BLOCK_ARG, false);
 
         if (shared_mem_rows_ == 0) {
-            shared_mem_rows_ = shifts_per_block_;
+            shared_mem_rows_ = shifts_per_thread_block_;
         }
 
         // TODO: Remove this if we change the implementation to work with fewer
         //  shared mem rows than shifts per block
-        if (shared_mem_rows_ < shifts_per_block_) {
+        if (shared_mem_rows_ < shifts_per_thread_block_) {
             throw argument_error("Invalid number of shared memory rows ["s +
                 std::to_string(shared_mem_rows_) +
                 "], must be greater than shifts per block [" +
-                std::to_string(shifts_per_block_) +
+                std::to_string(shifts_per_thread_block_) +
                 "]",
                  SHARED_MEM_ROWS_ARG);
         }
@@ -760,7 +758,7 @@ public:
 
     std::vector<std::pair<std::string, std::string>> additional_properties() const override {
         return std::vector<std::pair<std::string, std::string>>{
-            std::make_pair(SHIFTS_PER_BLOCK_ARG, std::to_string(shifts_per_block_)),
+            std::make_pair(SHIFTS_PER_THREAD_BLOCK_ARG, std::to_string(shifts_per_thread_block_)),
             std::make_pair(SHARED_MEM_ROW_SIZE_ARG, std::to_string(shared_mem_row_size_)),
             std::make_pair(SHARED_MEM_ROWS_ARG, std::to_string(shared_mem_rows_)),
             std::make_pair(STRIDED_LOAD_ARG, std::to_string(strided_load_)),
@@ -798,7 +796,7 @@ protected:
                          target_.matrix_size(),
                          result_.matrix_size(),
                          1,
-                         shifts_per_block_,
+                         shifts_per_thread_block_,
                          shared_mem_row_size_,
                          shared_mem_rows_,
                          1,
@@ -826,7 +824,7 @@ private:
 
     static std::vector<std::string> labels;
 
-    inline static const std::string SHIFTS_PER_BLOCK_ARG = "shifts_per_block";
+    inline static const std::string SHIFTS_PER_THREAD_BLOCK_ARG = "shifts_per_thread_block";
     inline static const std::string SHARED_MEM_ROW_SIZE_ARG = "shared_mem_row_size";
     inline static const std::string SHARED_MEM_ROWS_ARG = "shared_mem_rows";
     inline static const std::string STRIDED_LOAD_ARG = "strided_load";
@@ -841,7 +839,7 @@ private:
     T* d_target_;
     T* d_result_;
 
-    dsize_t shifts_per_block_;
+    dsize_t shifts_per_thread_block_;
     dsize_t shared_mem_row_size_;
     dsize_t shared_mem_rows_;
     bool strided_load_;
@@ -955,7 +953,7 @@ public:
     explicit naive_shuffle_multirow_right_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_one<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), target_(), result_()
     {
-        block_y_size_ = args.value("block_y_size", 8);
+        warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
         right_rows_per_thread_ = args.value("right_rows_per_thread", 4);
     }
 
@@ -973,7 +971,7 @@ public:
 
     std::vector<std::pair<std::string, std::string>> additional_properties() const override {
         return std::vector<std::pair<std::string, std::string>>{
-            std::make_pair("block_y_size", std::to_string(block_y_size_)),
+            std::make_pair("warps_per_thread_block", std::to_string(warps_per_thread_block_)),
             std::make_pair("right_rows_per_thread", std::to_string(right_rows_per_thread_))
         };
     }
@@ -1007,7 +1005,7 @@ protected:
                                   d_result_,
                                   target_.matrix_size(),
                                   result_.matrix_size(),
-                                  block_y_size_,
+                                  warps_per_thread_block_,
                                   right_rows_per_thread_
                               )
         );
@@ -1040,7 +1038,7 @@ private:
     T* d_target_;
     T* d_result_;
 
-    dsize_t block_y_size_;
+    dsize_t warps_per_thread_block_;
     dsize_t right_rows_per_thread_;
 };
 
@@ -1055,7 +1053,7 @@ public:
     explicit naive_shuffle_multirow_both_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_one<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), target_(), result_()
     {
-        block_y_size_ = args.value("block_y_size", 8);
+        warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
         shifts_per_thread_ = args.value("shifts_per_thread", 4);
         left_rows_per_thread_ = args.value("left_rows_per_thread", 3);
 
@@ -1075,7 +1073,7 @@ public:
 
     std::vector<std::pair<std::string, std::string>> additional_properties() const override {
         return std::vector<std::pair<std::string, std::string>>{
-            std::make_pair("block_y_size", std::to_string(block_y_size_)),
+            std::make_pair("warps_per_thread_block", std::to_string(warps_per_thread_block_)),
             std::make_pair("shifts_per_thread", std::to_string(shifts_per_thread_)),
             std::make_pair("left_rows_per_thread", std::to_string(left_rows_per_thread_))
         };
@@ -1110,7 +1108,7 @@ protected:
                                   d_result_,
                                   target_.matrix_size(),
                                   result_.matrix_size(),
-                                  block_y_size_,
+                                  warps_per_thread_block_,
                                   shifts_per_thread_,
                                   left_rows_per_thread_
                               )
@@ -1144,7 +1142,7 @@ private:
     T* d_target_;
     T* d_result_;
 
-    dsize_t block_y_size_;
+    dsize_t warps_per_thread_block_;
     dsize_t shifts_per_thread_;
     dsize_t left_rows_per_thread_;
 };
@@ -1160,7 +1158,7 @@ public:
     explicit naive_shuffle_multirow_both_one_to_one_orig(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_one<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), target_(), result_()
     {
-        block_y_size_ = args.value("block_y_size", 8);
+        warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
         shifts_per_thread_ = args.value("shifts_per_thread", 4);
         // TODO: Rename to left rows per iteration
         left_rows_per_thread_ = args.value("left_rows_per_thread", 3);
@@ -1181,7 +1179,7 @@ public:
 
     std::vector<std::pair<std::string, std::string>> additional_properties() const override {
         return std::vector<std::pair<std::string, std::string>>{
-            std::make_pair("block_y_size", std::to_string(block_y_size_)),
+            std::make_pair("warps_per_thread_block", std::to_string(warps_per_thread_block_)),
             std::make_pair("shifts_per_thread", std::to_string(shifts_per_thread_)),
             std::make_pair("left_rows_per_thread", std::to_string(left_rows_per_thread_))
         };
@@ -1216,7 +1214,7 @@ protected:
                                   d_result_,
                                   target_.matrix_size(),
                                   result_.matrix_size(),
-                                  block_y_size_,
+                                  warps_per_thread_block_,
                                   shifts_per_thread_,
                                   left_rows_per_thread_
                               )
@@ -1250,7 +1248,7 @@ private:
     T* d_target_;
     T* d_result_;
 
-    dsize_t block_y_size_;
+    dsize_t warps_per_thread_block_;
     dsize_t shifts_per_thread_;
     dsize_t left_rows_per_thread_;
 };
@@ -1267,7 +1265,7 @@ public:
     explicit naive_shuffle_multirow_right_multimat_right_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_one<T, BENCH_TYPE, ALLOC>(false, labels.size(), min_measured_time), ref_(), target_(), result_()
     {
-        block_y_size_ = args.value("block_y_size", 8);
+        warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
         right_rows_per_thread_ = args.value("right_rows_per_thread", 4);
     }
 
@@ -1285,7 +1283,7 @@ public:
 
     std::vector<std::pair<std::string, std::string>> additional_properties() const override {
         return std::vector<std::pair<std::string, std::string>>{
-            std::make_pair("block_y_size", std::to_string(block_y_size_)),
+            std::make_pair("warps_per_thread_block", std::to_string(warps_per_thread_block_)),
             std::make_pair("right_rows_per_thread", std::to_string(right_rows_per_thread_))
         };
     }
@@ -1320,7 +1318,7 @@ protected:
                                   target_.matrix_size(),
                                   result_.matrix_size(),
                                   1,
-                                  block_y_size_,
+                                  warps_per_thread_block_,
                                   right_rows_per_thread_,
                                   1
                               )
@@ -1354,7 +1352,7 @@ private:
     T* d_target_;
     T* d_result_;
 
-    dsize_t block_y_size_;
+    dsize_t warps_per_thread_block_;
     dsize_t right_rows_per_thread_;
 };
 
