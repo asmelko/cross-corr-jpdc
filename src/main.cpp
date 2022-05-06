@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <type_traits>
 
 #include <boost/program_options.hpp>
 
@@ -12,6 +13,7 @@
 #include "validate.hpp"
 #include "matrix.hpp"
 #include "cross_corr.hpp"
+#include "fft_alg.hpp"
 #include "allocator.cuh"
 #include "csv.hpp"
 #include "fft_helpers.hpp"
@@ -166,6 +168,30 @@ int run_computation_steps(
 }
 
 template<typename ALG>
+void store_output(
+    typename std::enable_if_t<std::is_base_of_v<fft_alg<typename ALG::data_type, typename ALG::allocator>, ALG>,ALG>& alg,
+    simple_logger& logger,
+    const std::filesystem::path& out_path,
+    bool normalize
+) {
+    logger.log("Normalizing and storing results");
+    fft_alg<typename ALG::data_type, typename ALG::allocator>& fft = alg;
+    fft.store_results(out_path, normalize);
+
+}
+
+template<typename ALG>
+void store_output(
+    typename std::enable_if_t<!std::is_base_of_v<fft_alg<typename ALG::data_type, typename ALG::allocator>, ALG>,ALG>& alg,
+    simple_logger& logger,
+    const std::filesystem::path& out_path,
+    [[maybe_unused]] bool normalize
+) {
+    logger.log("Storing results");
+    alg.store_results(out_path);
+}
+
+template<typename ALG>
 void run_store_output(
     ALG& alg,
     simple_logger& logger,
@@ -173,16 +199,7 @@ void run_store_output(
     bool normalize
 ) {
     if (out_path.has_value()) {
-        const auto& res = alg.results();
-        std::ofstream out_file(out_path.value());
-        if (alg.is_fft() && normalize) {
-            logger.log("Normalizing and storing results");
-            auto norm = normalize_fft_results(res);
-            norm.store_to_csv(out_file);
-        } else {
-            logger.log("Storing results");
-            res.store_to_csv(out_file);
-        }
+        store_output<ALG>(alg, logger, out_path.value(), normalize);
     }
 }
 
@@ -352,6 +369,7 @@ std::unordered_map<std::string, std::function<int(
         {"nai_shuffle_multimat_right_one_to_many", run_measurement<naive_shuffle_multimat_right_one_to_many<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
         {"nai_shuffle_multimat_right_work_distribution_one_to_one", run_measurement<naive_shuffle_multimat_right_work_distribution_one_to_one<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
         {"nai_shuffle_multimat_right_work_distribution_one_to_many", run_measurement<naive_shuffle_multimat_right_work_distribution_one_to_many<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
+        {"nai_shuffle_multimat_right_work_distribution_n_to_mn", run_measurement<naive_shuffle_multimat_right_work_distribution_n_to_mn<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
         {"nai_shuffle_multimat_right_work_distribution_n_to_m", run_measurement<naive_shuffle_multimat_right_work_distribution_n_to_m<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
         {"nai_shuffle_multimat_both_work_distribution_local_mem_n_to_m", run_measurement<naive_shuffle_multimat_both_work_distribution_local_mem_n_to_m<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
         {"nai_shuffle_multimat_both_work_distribution_n_to_m", run_measurement<naive_shuffle_multimat_both_work_distribution_n_to_m<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
@@ -361,7 +379,9 @@ std::unordered_map<std::string, std::function<int(
         {"nai_shuffle_multirow_both_local_mem_one_to_one", run_measurement<naive_shuffle_multirow_both_local_mem_one_to_one<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
         {"nai_shuffle_multirow_right_multimat_right_one_to_one", run_measurement<naive_shuffle_multirow_right_multimat_right_one_to_one<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
         {"nai_shuffle_multirow_right_multimat_right_one_to_many", run_measurement<naive_shuffle_multirow_right_multimat_right_one_to_many<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
+        {"nai_shuffle_multirow_right_multimat_right_n_to_mn", run_measurement<naive_shuffle_multirow_right_multimat_right_n_to_mn<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
         {"nai_shuffle_multirow_both_multimat_right_one_to_many", run_measurement<naive_shuffle_multirow_both_multimat_right_one_to_many<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
+        {"nai_shuffle_multirow_both_multimat_right_n_to_mn", run_measurement<naive_shuffle_multirow_both_multimat_right_n_to_mn<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
         {"nai_warp_per_shift_one_to_one", run_measurement<naive_warp_per_shift_one_to_one<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
         {"nai_warp_per_shift_simple_indexing_one_to_one", run_measurement<naive_warp_per_shift_simple_indexing_one_to_one<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
         {"nai_warp_per_shift_work_distribution_one_to_one", run_measurement<naive_warp_per_shift_work_distribution_one_to_one<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
@@ -439,6 +459,47 @@ void print_help(std::ostream& out, const std::string& name, const po::options_de
     out << "\t" << name << " [global options] input [input options] <alg_type> <rows> <columns> <left_matrices> <right_matrices>\n";
     out << options;
 }
+
+//int main(int argc, char **argv) {
+//    if (argc != 2) {
+//        std::cerr << "Invalid number of arguments: " << argc << "\n";
+//        return 1;
+//    }
+//
+//    dsize_t group_size = std::stoi(argv[1]);
+//    {
+//        auto matrix = load_matrix_array_from_csv<float, no_padding>("test_mat.csv");
+//        std::ofstream out{"original_original.csv"};
+//        matrix.store_to_csv(out);
+//    }
+//
+//    {
+//        auto matrix = load_matrix_array_from_csv<float, no_padding>("test_mat.csv");
+//        std::ofstream out{"original_interleaved.csv"};
+//        matrix.store_interleaved_to_csv(out, matrix.num_matrices() / group_size);
+//    }
+//
+//    {
+//        auto matrix = load_interleaved_matrix_array_from_csv<float, no_padding>("test_mat.csv", group_size);
+//        std::ofstream out{"interleaved_original.csv"};
+//        matrix.store_to_csv(out);
+//    }
+//
+//    {
+//        auto matrix = load_interleaved_matrix_array_from_csv<float, no_padding>("test_mat.csv", group_size);
+//        std::ofstream out{"interleaved_interleaved.csv"};
+//        matrix.store_interleaved_to_csv(out, matrix.num_matrices() / group_size);
+//    }
+//
+//    {
+//        auto matrix = load_matrix_array_from_csv<float, no_padding>("test_mat.csv");
+//        std::ofstream out{"original_original_interleaved.csv"};
+//        matrix.interleave(group_size).store_to_csv(out);
+//    }
+//
+//
+//    return 0;
+//}
 
 int main(int argc, char **argv) {
     try {
@@ -547,7 +608,7 @@ int main(int argc, char **argv) {
         po::variables_map vm;
         po::store(parsed, vm);
 
-        if (vm.count("help")) {
+        if ((vm.count("help") != 0 ) || (vm.count("command") == 0)) {
             print_help(std::cout, argv[0], all_options);
             return 0;
         }

@@ -4,6 +4,7 @@
 #include <chrono>
 
 #include "cross_corr.hpp"
+#include "fft_alg.hpp"
 #include "matrix.hpp"
 #include "stopwatch.hpp"
 #include "row_distribution.cuh"
@@ -32,7 +33,7 @@ protected:
         return BENCH_TYPE == BenchmarkType::Algorithm;
     }
 
-    data_array<T> get_valid_results() const override {
+    data_array<T> compute_valid_results() const override {
         return cpu_cross_corr_one_to_one(this->refs(), this->targets());
     }
 };
@@ -771,7 +772,7 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class fft_original_alg_one_to_one: public one_to_one<T, BENCH_TYPE, ALLOC> {
+class fft_original_alg_one_to_one: public one_to_one<T, BENCH_TYPE, ALLOC>, public fft_alg<T, ALLOC> {
 public:
     explicit fft_original_alg_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_one<T, BENCH_TYPE, ALLOC>(true, std::size(labels), min_measured_time),
@@ -904,7 +905,7 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class fft_reduced_transfer_one_to_one: public one_to_one<T, BENCH_TYPE, ALLOC> {
+class fft_reduced_transfer_one_to_one: public one_to_one<T, BENCH_TYPE, ALLOC>, public fft_alg<T, ALLOC> {
 public:
     explicit fft_reduced_transfer_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_one<T, BENCH_TYPE, ALLOC>(true, std::size(labels), min_measured_time),

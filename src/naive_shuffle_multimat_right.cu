@@ -565,6 +565,7 @@ __host__ void ccn_shuffle_multimat_right_work_distribution_right_mats_dispatch(
         (void)right_matrices_per_thread;
         (void)max_rows_per_thread;
         (void)cuda_stream;
+        assert(false);
     } else {
         if (MAX_RIGHT_MATRICES_PER_THREAD == right_matrices_per_thread) {
             dsize_t num_workers = DIST::num_workers(max_rows_per_thread, matrix_size.y, search_size.y);

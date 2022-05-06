@@ -393,6 +393,20 @@ public:
     }
 };
 
+template<typename SRC_MAT, typename DST_MAT>
+void copy_submatrix(const SRC_MAT& src, DST_MAT& dst) {
+    if (src.size() != dst.size()) {
+        throw std::runtime_error{"Copy of submatrices of different size"};
+    }
+
+    auto src_iter = src.begin();
+    auto dst_iter = dst.begin();
+
+    for (;src_iter != src.end() && dst_iter != dst.end(); ++src_iter,++dst_iter) {
+        *dst_iter = *src_iter;
+    }
+}
+
 template<typename T, typename ALLOC = std::allocator<T>>
 class data_array {
 public:
@@ -429,45 +443,7 @@ public:
     { }
 
     template<typename PADDING>
-    static std::tuple<data_array<T, ALLOC>, std::vector<dsize_t>>  load_from_csv(std::vector<std::ifstream> in) {
-        std::optional<dsize2_t> matrix_size;
-        std::optional<dsize2_t> padded_size;
-        std::vector<dsize_t> num_matrices(in.size());
-
-        dsize_t total_data_size = 0;
-        dsize_t total_num_matrices = 0;
-        for (auto&& i : in) {
-            auto [in_matrix_size, in_num_matrices] = impl::csv::read_header(i);
-            auto in_padded_size = PADDING::total_size(in_matrix_size);
-            if (!matrix_size.has_value()) {
-                matrix_size = in_matrix_size;
-                padded_size = in_padded_size;
-            } else if (*matrix_size != in_matrix_size || *padded_size != in_padded_size) {
-                throw std::runtime_error{"Data array contains matrices of different sizes"};
-            }
-            total_data_size += padded_size->area();
-            total_num_matrices += in_num_matrices;
-            num_matrices.push_back(in_num_matrices);
-        }
-
-
-        std::vector<T, ALLOC> data(total_data_size);
-        auto mat_data = data.data();
-        for (dsize_t i = 0; i < in.size(); ++i) {
-            for (dsize_t matrix = 0; matrix < num_matrices[i]; ++matrix) {
-                impl::csv::read_data<T, PADDING>(in[i], *matrix_size, *padded_size, mat_data);
-                mat_data += padded_size->area();
-            }
-        }
-
-        return {
-            data_array<T, ALLOC>{*padded_size, total_num_matrices, std::move(data)},
-            std::move(num_matrices)
-        };
-    }
-
-    template<typename PADDING>
-    static data_array<T, ALLOC> load_from_csv(std::ifstream& in) {
+    static data_array<T, ALLOC> load_from_csv(std::istream& in) {
         auto [matrix_size, num_matrices] = impl::csv::read_header(in);
 
         auto padded_matrix_size = PADDING::total_size(matrix_size);
@@ -482,11 +458,48 @@ public:
         return data_array<T, ALLOC>{padded_matrix_size, num_matrices, std::move(data)};
     }
 
-    void store_to_csv(std::vector<std::ofstream> outputs) const {
-        for (dsize_t i = 0; i < outputs.size(); ++i) {
-            impl::csv::write_header(outputs[i], matrix_size_);
-            impl::csv::write_data(outputs[i], matrix_size_, data_.data() + matrix_size_.area() * i);
+    /**
+     * Load data from the input stream and interleave them for use with n_to_mn algorithm
+     * The original algorithm in each iteration uses all n left matrices with the corresponding
+     * [n*i,n*(i+1)) right matrices. Whereas our algorithms expect matrices to be grouped
+     * so that first m matrices are to be processed with the first left matrix, right matrices [m, 2m)
+     * with the second matrix etc.
+     *
+     * This functions loads matrices from input so that they can be used by our algorithms
+     * and if stored back using the interleaved version, will match the ordering of the original
+     * algorithm.
+     *
+     * The n tells us the number of left matrices, which corresponds to the interleaved group size
+     * Input matrix i is in group i / group_size and has group_local_index of i % group_size.
+     * The number of loaded matrices must be divisible by the group_size, otherwise an exception
+     * is thrown. Number of matrices divided by group_size gives us num_groups.
+     *
+     * Input matrix i in the input file is placed as group_local_index * num_groups + group.
+     * This operations is invertible by switching group_size and num_groups.
+     *
+     * @tparam PADDING
+     * @param in
+     * @return
+     */
+    template<typename PADDING>
+    static data_array<T, ALLOC> load_interleaved_from_csv(std::istream& in, dsize_t group_size) {
+        auto [matrix_size, num_matrices] = impl::csv::read_header(in);
+
+        if (num_matrices % group_size != 0) {
+            throw std::runtime_error{"Data array cannot be interleaved, as number of matrices is not divisible by group size"};
         }
+
+        auto padded_matrix_size = PADDING::total_size(matrix_size);
+        auto total_data_size = padded_matrix_size.area() * num_matrices;
+        auto num_groups = num_matrices / group_size;
+
+        std::vector<T, ALLOC> data(total_data_size);
+        auto buffer = data.data();
+        for (dsize_t i = 0; i < num_matrices; ++i) {
+            auto mat_data = buffer + get_interleaved_index(i, group_size, num_groups) * padded_matrix_size.area();
+            impl::csv::read_data<T, PADDING>(in, matrix_size, padded_matrix_size, mat_data);
+        }
+        return data_array<T, ALLOC>{padded_matrix_size, num_matrices, std::move(data)};
     }
 
     void store_to_csv(std::ostream& output) const {
@@ -495,6 +508,47 @@ public:
         for (dsize_t i = 0; i < num_matrices_; ++i) {
             impl::csv::write_data(output, matrix_size_, data_.data() + matrix_size_.area() * i);
         }
+    }
+
+    /**
+     * Stores matrices to csv file, interleaving them after the use by n_to_mn algorithm.
+     * This is to be used on data loaded using the interleaved version.
+     *
+     * Here, num_groups is the number of groups the original input was split into
+     *
+     * @param output
+     * @param group_size
+     */
+    void store_interleaved_to_csv(std::ostream& output, dsize_t num_groups) const {
+        if (num_matrices_ % num_groups != 0) {
+            throw std::runtime_error{"Data array cannot be interleaved, as number of matrices is not divisible by group size"};
+        }
+
+        impl::csv::write_header(output, matrix_size_, num_matrices_);
+
+        dsize_t group_size = num_matrices_ / num_groups;
+        for (dsize_t i = 0; i < num_matrices_; ++i) {
+            // This is basically an inverse of all other usage of this function
+            // as elsewhere we compute dst index
+            // This is why we want num_groups from the original, as that computes the inverse
+            dsize_t src_interleaved_inx = get_interleaved_index(i, group_size, num_groups);
+            impl::csv::write_data(output, matrix_size_, data_.data() + matrix_size_.area() * src_interleaved_inx);
+        }
+    }
+
+    template<typename OUT_ALLOC = ALLOC>
+    data_array<T, OUT_ALLOC> interleave(dsize_t group_size) const {
+        data_array<T, OUT_ALLOC> interleaved{matrix_size_, num_matrices_};
+
+        dsize_t num_groups = num_matrices_ / group_size;
+        for (dsize_t i = 0; i < num_matrices_; ++i) {
+            dsize_t interleaved_idx = get_interleaved_index(i, group_size, num_groups);
+            auto src_view = view(i);
+            auto dst_view = interleaved.view(interleaved_idx);
+            copy_submatrix(src_view, dst_view);
+        }
+
+        return interleaved;
     }
 
     [[nodiscard]] size_type size() const {
@@ -556,6 +610,39 @@ private:
     data_array(dsize2_t matrix_size, dsize_t num_matrices, std::vector<T, ALLOC>&& data)
         :num_matrices_(num_matrices), matrix_size_(matrix_size), data_(std::move(data))
     { }
+
+    static dsize_t get_interleaved_index(dsize_t idx, dsize_t group_size, dsize_t num_groups) {
+        auto group = idx / group_size;
+        auto group_local_index = idx % group_size;
+        return group_local_index * num_groups + group;
+    }
 };
+
+/**
+ * Load matrix array from single csv file containing multiple matrices
+ */
+template<typename T, typename PADDING, typename ALLOC = std::allocator<T>>
+data_array<T,ALLOC> load_matrix_array_from_csv(const std::filesystem::path& path) {
+    std::ifstream file(path);
+    return data_array<T,ALLOC>::template load_from_csv<PADDING>(file);
+}
+
+/**
+ * Load matrix from a csv file
+ */
+template<typename T, typename PADDING, typename ALLOC = std::allocator<T>>
+data_array<T,ALLOC> load_matrix_from_csv(const std::filesystem::path& path) {
+    // TODO: Maybe throw if more than one matrix
+    return load_matrix_array_from_csv<T, PADDING, ALLOC>(path);
+}
+
+/**
+ * Load matrix array from single csv file containing multiple matrices
+ */
+template<typename T, typename PADDING, typename ALLOC = std::allocator<T>>
+data_array<T,ALLOC> load_interleaved_matrix_array_from_csv(const std::filesystem::path& path, dsize_t group_size) {
+    std::ifstream file(path);
+    return data_array<T,ALLOC>::template load_interleaved_from_csv<PADDING>(file, group_size);
+}
 
 }

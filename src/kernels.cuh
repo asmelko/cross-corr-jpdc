@@ -193,7 +193,8 @@ void run_ccn_shuffle_multirow_right_multimat_right(
     dsize_t num_right_matrices,
     dsize_t warps_per_thread_block,
     dsize_t right_rows_per_thread,
-    dsize_t right_matrices_per_thread
+    dsize_t right_matrices_per_thread,
+    cudaStream_t cuda_stream = nullptr
 );
 
 template<typename T, typename RES>
@@ -207,7 +208,8 @@ void run_ccn_shuffle_one_to_many_multirow_both_multimat_right(
     dsize_t warps_per_thread_block,
     dsize_t shifts_per_thread_right_matrix,
     dsize_t right_matrices_per_thread,
-    dsize_t left_rows_per_iteration
+    dsize_t left_rows_per_iteration,
+    cudaStream_t cuda_stream = nullptr
 );
 
 template<typename T, typename RES>

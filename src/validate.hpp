@@ -221,8 +221,8 @@ void cpu_cross_corr_one_to_one(const REF& ref, const TARGET& target, RESULT& res
     naive_cpu_cross_corr(ref.view(), target.view(), result.view());
 }
 
-template<typename T, typename ALLOC>
-data_array<T> cpu_cross_corr_one_to_one(const data_array<T, ALLOC>& ref, const data_array<T, ALLOC>& target) {
+template<typename T, typename ALLOC_REF, typename ALLOC_TARGET>
+data_array<T> cpu_cross_corr_one_to_one(const data_array<T, ALLOC_REF>& ref, const data_array<T, ALLOC_TARGET>& target) {
     data_array<T> result{result_matrix_size(ref.matrix_size(), target.matrix_size())};
     cpu_cross_corr_one_to_one(ref, target, result);
     return result;
@@ -239,8 +239,8 @@ void cpu_cross_corr_one_to_many(const REF& ref, const TARGET& target, RESULT& re
     }
 }
 
-template<typename T, typename ALLOC>
-data_array<T> cpu_cross_corr_one_to_many(const data_array<T, ALLOC>& ref, const data_array<T, ALLOC>& target) {
+template<typename T, typename ALLOC_REF, typename ALLOC_TARGET>
+data_array<T> cpu_cross_corr_one_to_many(const data_array<T, ALLOC_REF>& ref, const data_array<T, ALLOC_TARGET>& target) {
     data_array<T> result{result_matrix_size(ref.matrix_size(), target.matrix_size()), target.num_matrices()};
     cpu_cross_corr_one_to_many(ref, target, result);
     return result;
@@ -269,8 +269,8 @@ void cpu_cross_corr_n_to_mn(const REF& ref, const TARGET& target, RESULT& result
     }
 }
 
-template<typename T, typename ALLOC>
-data_array<T> cpu_cross_corr_n_to_mn(const data_array<T, ALLOC>& ref, const data_array<T, ALLOC>& target) {
+template<typename T, typename ALLOC_REF, typename ALLOC_TARGET>
+data_array<T> cpu_cross_corr_n_to_mn(const data_array<T, ALLOC_REF>& ref, const data_array<T, ALLOC_TARGET>& target) {
     data_array<T> result{result_matrix_size(ref.matrix_size(), target.matrix_size()), ref.num_matrices()};
     cpu_cross_corr_n_to_mn(ref, target, result);
     return result;
@@ -290,8 +290,8 @@ void cpu_cross_corr_n_to_m(const REF& ref, const TARGET& target, RESULT& result)
     }
 }
 
-template<typename T, typename ALLOC>
-data_array<T> cpu_cross_corr_n_to_m(const data_array<T, ALLOC>& ref, const data_array<T, ALLOC>& target) {
+template<typename T, typename ALLOC_REF, typename ALLOC_TARGET>
+data_array<T> cpu_cross_corr_n_to_m(const data_array<T, ALLOC_REF>& ref, const data_array<T, ALLOC_TARGET>& target) {
     data_array<T> result{result_matrix_size(ref.matrix_size(),target.matrix_size()), ref.num_matrices() * target.num_matrices()};
     cpu_cross_corr_n_to_m(ref, target, result);
     return result;

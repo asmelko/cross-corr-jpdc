@@ -32,7 +32,7 @@ protected:
         return BENCH_TYPE == BenchmarkType::Algorithm;
     }
 
-    data_array<T> get_valid_results() const override {
+    data_array<T> compute_valid_results() const override {
         return cpu_cross_corr_n_to_m(this->refs(), this->targets());
     }
 };
@@ -163,8 +163,8 @@ protected:
     void prepare_impl() override {
         naive_gpu_n_to_m<T, BENCH_TYPE, ALLOC>::prepare_impl();
 
-        for (auto & cudaStream : cuda_streams_) {
-            CUCH(cudaStreamCreate(&cudaStream));
+        for (auto & cuda_stream : cuda_streams_) {
+            CUCH(cudaStreamCreate(&cuda_stream));
         }
     }
 
@@ -173,8 +173,8 @@ protected:
     }
 
     void free_impl() override {
-        for (auto & cudaStream : cuda_streams_) {
-            CUCH(cudaStreamDestroy(cudaStream));
+        for (auto & cuda_stream : cuda_streams_) {
+            CUCH(cudaStreamDestroy(cuda_stream));
         }
 
         naive_gpu_n_to_m<T, BENCH_TYPE, ALLOC>::free_impl();
@@ -231,8 +231,8 @@ protected:
     void prepare_impl() override {
         naive_gpu_n_to_m<T, BENCH_TYPE, ALLOC>::prepare_impl();
 
-        for (auto & cudaStream : cuda_streams_) {
-            CUCH(cudaStreamCreate(&cudaStream));
+        for (auto& cuda_stream : cuda_streams_) {
+            CUCH(cudaStreamCreate(&cuda_stream));
         }
     }
 
@@ -251,8 +251,8 @@ protected:
     }
 
     void free_impl() override {
-        for (auto & cudaStream : cuda_streams_) {
-            CUCH(cudaStreamDestroy(cudaStream));
+        for (auto & cuda_stream : cuda_streams_) {
+            CUCH(cudaStreamDestroy(cuda_stream));
         }
 
         naive_gpu_n_to_m<T, BENCH_TYPE, ALLOC>::free_impl();
@@ -503,7 +503,7 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class fft_better_hadamard_alg_n_to_m: public n_to_m<T, BENCH_TYPE, ALLOC> {
+class fft_better_hadamard_alg_n_to_m: public n_to_m<T, BENCH_TYPE, ALLOC>, public fft_alg<T, ALLOC> {
 public:
     explicit fft_better_hadamard_alg_n_to_m([[maybe_unused]] const json& args, std::chrono::nanoseconds min_measured_time)
         :n_to_m<T, BENCH_TYPE, ALLOC>(true, std::size(labels), min_measured_time),

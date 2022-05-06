@@ -28,7 +28,7 @@ protected:
         return BENCH_TYPE == BenchmarkType::Algorithm;
     }
 
-    data_array<T> get_valid_results() const override {
+    data_array<T> compute_valid_results() const override {
         return cpu_cross_corr_one_to_many(this->refs(), this->targets());
     }
 };
@@ -359,7 +359,6 @@ public:
     explicit naive_shuffle_multirow_both_multimat_right_one_to_many(const json& args, std::chrono::nanoseconds min_measured_time)
         :naive_gpu_one_to_many<T, BENCH_TYPE, ALLOC>(std::size(labels), min_measured_time)
     {
-        // TODO: Rename in all other shuffle algorithms to this
         warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
         shifts_per_thread_right_matrix_ = args.value("shifts_per_thread_right_matrix", 4);
         right_matrices_per_thread_ = args.value("right_matrices_per_thread", 4);
@@ -500,7 +499,7 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class fft_original_alg_one_to_many: public one_to_many<T, BENCH_TYPE, ALLOC> {
+class fft_original_alg_one_to_many: public one_to_many<T, BENCH_TYPE, ALLOC>, public fft_alg<T, ALLOC> {
 public:
     explicit fft_original_alg_one_to_many([[maybe_unused]] const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_many<T, BENCH_TYPE, ALLOC>(true, std::size(labels), min_measured_time),
@@ -636,7 +635,7 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class fft_reduced_transfer_one_to_many: public one_to_many<T, BENCH_TYPE, ALLOC> {
+class fft_reduced_transfer_one_to_many: public one_to_many<T, BENCH_TYPE, ALLOC>, public fft_alg<T, ALLOC> {
 public:
     explicit fft_reduced_transfer_one_to_many([[maybe_unused]] const json& args, std::chrono::nanoseconds min_measured_time)
         :one_to_many<T, BENCH_TYPE, ALLOC>(true, std::size(labels), min_measured_time),

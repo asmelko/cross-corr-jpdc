@@ -619,7 +619,8 @@ __host__ void ccn_shuffle_one_to_many_multirow_both_multimat_right_left_rows_dis
     dsize2_t search_size,
     dsize_t num_right_matrices,
     dsize_t warps_per_thread_block,
-    dsize_t left_rows_per_iteration
+    dsize_t left_rows_per_iteration,
+    cudaStream_t cuda_stream
 ) {
     if constexpr(LEFT_ROWS_PER_ITER > 0) {
         if (LEFT_ROWS_PER_ITER == left_rows_per_iteration) {
@@ -636,7 +637,7 @@ __host__ void ccn_shuffle_one_to_many_multirow_both_multimat_right_left_rows_dis
             dsize_t block_size = num_threads.x * num_threads.y;
             dsize_t shared_mem_size = block_size * MAX_SHIFTS_PER_RIGHT_MATRIX * MAX_RIGHT_MATRICES_PER_THREAD * sizeof(RES);
 
-            ccn_shuffle_one_to_many_multirow_both_multimat_right<MAX_SHIFTS_PER_RIGHT_MATRIX, MAX_RIGHT_MATRICES_PER_THREAD, LEFT_ROWS_PER_ITER><<<num_blocks, num_threads, shared_mem_size>>>(
+            ccn_shuffle_one_to_many_multirow_both_multimat_right<MAX_SHIFTS_PER_RIGHT_MATRIX, MAX_RIGHT_MATRICES_PER_THREAD, LEFT_ROWS_PER_ITER><<<num_blocks, num_threads, shared_mem_size, cuda_stream>>>(
                 left,
                 right,
                 out,
@@ -653,7 +654,8 @@ __host__ void ccn_shuffle_one_to_many_multirow_both_multimat_right_left_rows_dis
                 search_size,
                 num_right_matrices,
                 warps_per_thread_block,
-                left_rows_per_iteration
+                left_rows_per_iteration,
+                cuda_stream
             );
         }
     } else {
@@ -668,6 +670,7 @@ __host__ void ccn_shuffle_one_to_many_multirow_both_multimat_right_left_rows_dis
         (void)num_right_matrices;
         (void)warps_per_thread_block;
         (void)left_rows_per_iteration;
+        (void)cuda_stream;
         assert(false);
     }
 }
@@ -682,7 +685,8 @@ __host__ void ccn_shuffle_one_to_many_multirow_both_multimat_right_right_mats_di
     dsize_t num_right_matrices,
     dsize_t warps_per_thread_block,
     dsize_t right_matrices_per_thread,
-    dsize_t left_rows_per_iteration
+    dsize_t left_rows_per_iteration,
+    cudaStream_t cuda_stream
 ) {
     if constexpr(MAX_RIGHT_MATRICES_PER_THREAD > 0) {
         if (MAX_RIGHT_MATRICES_PER_THREAD == right_matrices_per_thread) {
@@ -694,7 +698,8 @@ __host__ void ccn_shuffle_one_to_many_multirow_both_multimat_right_right_mats_di
                 search_size,
                 num_right_matrices,
                 warps_per_thread_block,
-                left_rows_per_iteration
+                left_rows_per_iteration,
+                cuda_stream
             );
         } else {
             ccn_shuffle_one_to_many_multirow_both_multimat_right_right_mats_dispatch<MAX_SHIFTS_PER_RIGHT_MATRIX, MAX_RIGHT_MATRICES_PER_THREAD - 1, LEFT_ROWS_PER_ITER>(
@@ -706,7 +711,8 @@ __host__ void ccn_shuffle_one_to_many_multirow_both_multimat_right_right_mats_di
                 num_right_matrices,
                 warps_per_thread_block,
                 right_matrices_per_thread,
-                left_rows_per_iteration
+                left_rows_per_iteration,
+                cuda_stream
             );
         }
     } else {
@@ -722,6 +728,7 @@ __host__ void ccn_shuffle_one_to_many_multirow_both_multimat_right_right_mats_di
         (void)warps_per_thread_block;
         (void)right_matrices_per_thread;
         (void)left_rows_per_iteration;
+        (void)cuda_stream;
         assert(false);
     }
 }
@@ -737,7 +744,8 @@ __host__ void ccn_shuffle_one_to_many_multirow_both_multimat_right_shifts_dispat
     dsize_t warps_per_thread_block,
     dsize_t shifts_per_thread_right_matrix,
     dsize_t right_matrices_per_thread,
-    dsize_t left_rows_per_iteration
+    dsize_t left_rows_per_iteration,
+    cudaStream_t cuda_stream
 ) {
     if constexpr(MAX_SHIFTS_PER_RIGHT_MATRIX > 0) {
         if (MAX_SHIFTS_PER_RIGHT_MATRIX == shifts_per_thread_right_matrix) {
@@ -750,7 +758,8 @@ __host__ void ccn_shuffle_one_to_many_multirow_both_multimat_right_shifts_dispat
                 num_right_matrices,
                 warps_per_thread_block,
                 right_matrices_per_thread,
-                left_rows_per_iteration
+                left_rows_per_iteration,
+                cuda_stream
             );
         } else {
             ccn_shuffle_one_to_many_multirow_both_multimat_right_shifts_dispatch<MAX_SHIFTS_PER_RIGHT_MATRIX - 1, MAX_RIGHT_MATRICES_PER_THREAD, LEFT_ROWS_PER_ITER>(
@@ -763,7 +772,8 @@ __host__ void ccn_shuffle_one_to_many_multirow_both_multimat_right_shifts_dispat
                 warps_per_thread_block,
                 shifts_per_thread_right_matrix,
                 right_matrices_per_thread,
-                left_rows_per_iteration
+                left_rows_per_iteration,
+                cuda_stream
             );
         }
     } else {
@@ -780,6 +790,7 @@ __host__ void ccn_shuffle_one_to_many_multirow_both_multimat_right_shifts_dispat
         (void)shifts_per_thread_right_matrix;
         (void)right_matrices_per_thread;
         (void)left_rows_per_iteration;
+        (void)cuda_stream;
         assert(false);
     }
 }
@@ -798,7 +809,8 @@ void run_ccn_shuffle_one_to_many_multirow_both_multimat_right(
     dsize_t warps_per_thread_block,
     dsize_t shifts_per_thread_right_matrix,
     dsize_t right_matrices_per_thread,
-    dsize_t left_rows_per_iteration
+    dsize_t left_rows_per_iteration,
+    cudaStream_t cuda_stream = nullptr
 ) {
     if (warps_per_thread_block > 32) {
         throw std::runtime_error("Cuda block too large: "s + std::to_string(warps_per_thread_block) + " (max 32)");
@@ -841,7 +853,8 @@ void run_ccn_shuffle_one_to_many_multirow_both_multimat_right(
         warps_per_thread_block,
         shifts_per_thread_right_matrix,
         right_matrices_per_thread,
-        left_rows_per_iteration
+        left_rows_per_iteration,
+        cuda_stream
     );
 }
 
@@ -855,7 +868,8 @@ template void run_ccn_shuffle_one_to_many_multirow_both_multimat_right<int, int>
     dsize_t warps_per_thread_block,
     dsize_t shifts_per_thread_right_matrix,
     dsize_t right_matrices_per_thread,
-    dsize_t left_rows_per_iteration
+    dsize_t left_rows_per_iteration,
+    cudaStream_t cuda_stream
 );
 
 template void run_ccn_shuffle_one_to_many_multirow_both_multimat_right<float, float>(
@@ -868,7 +882,8 @@ template void run_ccn_shuffle_one_to_many_multirow_both_multimat_right<float, fl
     dsize_t warps_per_thread_block,
     dsize_t shifts_per_thread_right_matrix,
     dsize_t right_matrices_per_thread,
-    dsize_t left_rows_per_iteration
+    dsize_t left_rows_per_iteration,
+    cudaStream_t cuda_stream
 );
 
 template void run_ccn_shuffle_one_to_many_multirow_both_multimat_right<double, double>(
@@ -881,7 +896,8 @@ template void run_ccn_shuffle_one_to_many_multirow_both_multimat_right<double, d
     dsize_t warps_per_thread_block,
     dsize_t shifts_per_thread_right_matrix,
     dsize_t right_matrices_per_thread,
-    dsize_t left_rows_per_iteration
+    dsize_t left_rows_per_iteration,
+    cudaStream_t cuda_stream
 );
 
 }

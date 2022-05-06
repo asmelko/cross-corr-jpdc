@@ -36,7 +36,7 @@ std::ostream& operator<<(std::ostream& out, const std::vector<T>& vec) {
 
 template<typename VAL>
 std::vector<VAL> get_sorted_values(const std::unordered_set<VAL>& set) {
-    std::vector<std::string> values{set.size()};
+    std::vector<std::string> values{set.begin(), set.end()};
     std::sort(values.begin(), values.end());
     return values;
 }

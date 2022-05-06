@@ -51,12 +51,10 @@ protected:
         return BENCH_TYPE == BenchmarkType::Algorithm;
     }
 
-    data_array<T> get_valid_results() const override {
+    data_array<T> compute_valid_results() const override {
         return cpu_cross_corr_n_to_mn(this->refs(), this->targets());
     }
 protected:
-
-
     static void check_input_sizes_divisible(dsize_t ref_num_matrices, dsize_t target_num_matrices) {
         if (!input_sizes_divisible(ref_num_matrices, target_num_matrices)) {
             throw std::runtime_error(
@@ -133,14 +131,6 @@ public:
         return results_;
     }
 protected:
-    void load_impl(const std::filesystem::path& ref_path, const std::filesystem::path& def_path) override {
-        refs_ = load_matrix_array_from_csv<T, no_padding, ALLOC>(ref_path);
-        targets_ = load_matrix_array_from_csv<T, no_padding, ALLOC>(def_path);
-
-        this->check_input_sizes_divisible(refs_.num_matrices(), targets_.num_matrices());
-        this->check_matrices_same_size(refs_, targets_);
-    }
-
     void prepare_impl() override {
         auto result_matrix_size = refs_.matrix_size() + targets_.matrix_size() - 1;
         results_ = data_array<T, ALLOC>{result_matrix_size, targets_.num_matrices()};
@@ -165,6 +155,22 @@ protected:
         CUCH(cudaFree(d_refs_));
     }
 
+    void load_original(const std::filesystem::path& ref_path, const std::filesystem::path& def_path) {
+        refs_ = load_matrix_array_from_csv<T, no_padding, ALLOC>(ref_path);
+        targets_ = load_matrix_array_from_csv<T, no_padding, ALLOC>(def_path);
+
+        check_inputs();
+    }
+
+    void load_deinterleaved(const std::filesystem::path& ref_path, const std::filesystem::path& target_path) {
+        this->refs_ = load_matrix_array_from_csv<T, no_padding, ALLOC>(ref_path);
+
+        dsize_t group_size = this->refs_.num_matrices();
+        this->targets_ = load_interleaved_matrix_array_from_csv<T, no_padding, ALLOC>(target_path, group_size);
+
+        check_inputs();
+    }
+
     data_array<T, ALLOC> refs_;
     data_array<T, ALLOC> targets_;
     data_array<T, ALLOC> results_;
@@ -172,6 +178,11 @@ protected:
     T* d_refs_;
     T* d_targets_;
     T* d_results_;
+private:
+    void check_inputs() const {
+        this->check_input_sizes_divisible(refs_.num_matrices(), targets_.num_matrices());
+        this->check_matrices_same_size(refs_, targets_);
+    }
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
@@ -183,6 +194,10 @@ public:
 
     }
 protected:
+    void load_impl(const std::filesystem::path& ref_path, const std::filesystem::path& def_path) override {
+        this->load_original(ref_path, def_path);
+    }
+
     void run_impl() override {
         CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
             run_cross_corr_naive_original(
@@ -210,7 +225,354 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class fft_original_alg_n_to_mn: public n_to_mn<T, BENCH_TYPE, ALLOC> {
+class naive_shuffle_multimat_right_work_distribution_n_to_mn: public naive_gpu_n_to_mn<T, BENCH_TYPE, ALLOC> {
+public:
+    explicit naive_shuffle_multimat_right_work_distribution_n_to_mn([[maybe_unused]] const json& args, std::chrono::nanoseconds min_measured_time)
+        :naive_gpu_n_to_mn<T, BENCH_TYPE, ALLOC>(std::size(labels), min_measured_time),
+         cuda_streams_()
+    {
+        warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
+        right_matrices_per_thread_ = args.value("right_matrices_per_thread", 2);
+        rows_per_thread_ = args.value("rows_per_thread", 10);
+        distribution_type_ = from_string(args.value("distribution_type", "rectangle"));
+
+        auto num_cuda_streams = args.value("num_cuda_streams", 8);
+
+        cuda_streams_.resize(num_cuda_streams);
+    }
+
+    [[nodiscard]] std::vector<std::pair<std::string, std::string>> additional_properties() const override {
+        return std::vector<std::pair<std::string, std::string>>{
+            std::make_pair("warps_per_thread_block", std::to_string(warps_per_thread_block_)),
+            std::make_pair("right_matrices_per_thread", std::to_string(right_matrices_per_thread_)),
+            std::make_pair("rows_per_thread", std::to_string(rows_per_thread_)),
+            std::make_pair("distribution_type", to_string(distribution_type_)),
+            std::make_pair("num_cuda_streams", std::to_string(cuda_streams_.size()))
+        };
+    }
+protected:
+    void load_impl(const std::filesystem::path& ref_path, const std::filesystem::path& def_path) override {
+        this->load_deinterleaved(ref_path, def_path);
+    }
+
+    void prepare_impl() override {
+        naive_gpu_n_to_mn<T, BENCH_TYPE, ALLOC>::prepare_impl();
+
+        for (auto & cuda_stream : cuda_streams_) {
+            CUCH(cudaStreamCreate(&cuda_stream));
+        }
+    }
+
+    void run_impl() override {
+        // Cannot use CUDA measure as we are using multiple streams
+        CPU_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_, true,
+             switch (distribution_type_) {
+                 case distribution::none:
+                     start_kernels<no_distribution>();
+                     break;
+                 case distribution::rectangle:
+                     start_kernels<rectangle_distribution>();
+                     break;
+                 case distribution::triangle:
+                     start_kernels<triangle_distribution>();
+                     break;
+             }
+        );
+    }
+
+    void free_impl() override {
+        for (auto & cuda_stream : cuda_streams_) {
+            CUCH(cudaStreamDestroy(cuda_stream));
+        }
+
+        naive_gpu_n_to_mn<T, BENCH_TYPE, ALLOC>::free_impl();
+    }
+
+    void store_results_impl(const std::filesystem::path& out_path) const override {
+        dsize_t num_groups = this->targets().num_matrices() / this->refs().num_matrices();
+        std::ofstream out{out_path};
+        this->results().store_interleaved_to_csv(out, num_groups);
+    }
+
+    [[nodiscard]] std::vector<const char*> measurement_labels_impl() const override {
+        return this->measure_alg() ?
+               std::vector<const char*>(std::begin(labels), std::end(labels)) :
+               std::vector<const char*>{};
+    }
+
+    data_array<T> load_valid_results(const std::filesystem::path& valid_data_path) const override {
+        // Deinterleave the results
+        return load_interleaved_matrix_array_from_csv<T, no_padding>(valid_data_path, this->refs().num_matrices());
+    }
+
+    data_array<T> compute_valid_results() const override {
+        dsize_t num_groups = this->targets().num_matrices() / this->refs().num_matrices();
+        // We need to pass num_groups as group_size to again interleave the targets, it makes it basically an inverse function
+        // We need to interleave them again as cpu implementation uses the original ordering
+        auto deinterleaved_targets = this->targets().template interleave<std::allocator<T>>(num_groups);
+
+        // We need to again deinterleave the results as it is compared to the deinterleaved results of our algorithm
+        return cpu_cross_corr_n_to_mn(this->refs(), deinterleaved_targets).interleave(this->refs().num_matrices());
+    }
+private:
+    inline static const char* labels[] = {
+        "Kernel"
+    };
+
+    std::vector<cudaStream_t> cuda_streams_;
+
+    dsize_t warps_per_thread_block_;
+    dsize_t right_matrices_per_thread_;
+    dsize_t rows_per_thread_;
+    distribution distribution_type_;
+
+    template<typename DISTRIBUTION>
+    void start_kernels() {
+        cuda_memset(this->d_results_, 0, this->results_.size());
+
+        dsize_t right_mats_per_left_mat = this->targets_.num_matrices() / this->refs_.num_matrices();
+        for (dsize_t ref = 0; ref < this->refs_.num_matrices(); ++ref) {
+            run_ccn_shuffle_multimat_right_work_distribution<DISTRIBUTION>(
+                this->d_refs_ + ref * this->refs_.matrix_size().area(),
+                this->d_targets_ + (ref * right_mats_per_left_mat) * this->targets_.matrix_size().area(),
+                this->d_results_ + (ref * right_mats_per_left_mat) * this->results_.matrix_size().area(),
+                this->targets_.matrix_size(),
+                this->results_.matrix_size(),
+                right_mats_per_left_mat,
+                warps_per_thread_block_,
+                right_matrices_per_thread_,
+                rows_per_thread_,
+                cuda_streams_[ref % cuda_streams_.size()]
+            );
+        }
+    }
+};
+
+template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
+class naive_shuffle_multirow_right_multimat_right_n_to_mn: public naive_gpu_n_to_mn<T, BENCH_TYPE, ALLOC> {
+public:
+    explicit naive_shuffle_multirow_right_multimat_right_n_to_mn([[maybe_unused]] const json& args, std::chrono::nanoseconds min_measured_time)
+        :naive_gpu_n_to_mn<T, BENCH_TYPE, ALLOC>(std::size(labels), min_measured_time),
+         cuda_streams_()
+    {
+        warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
+        right_rows_per_thread_ = args.value("right_rows_per_thread", 4);
+        right_matrices_per_thread_ = args.value("right_matrices_per_thread", 4);
+
+        auto num_cuda_streams = args.value("num_cuda_streams", 8);
+
+        cuda_streams_.resize(num_cuda_streams);
+    }
+
+    [[nodiscard]] std::vector<std::pair<std::string, std::string>> additional_properties() const override {
+        return std::vector<std::pair<std::string, std::string>>{
+            std::make_pair("warps_per_thread_block", std::to_string(warps_per_thread_block_)),
+            std::make_pair("right_rows_per_thread", std::to_string(right_rows_per_thread_)),
+            std::make_pair("right_matrices_per_thread", std::to_string(right_matrices_per_thread_)),
+            std::make_pair("num_cuda_streams", std::to_string(cuda_streams_.size()))
+        };
+    }
+protected:
+    void load_impl(const std::filesystem::path& ref_path, const std::filesystem::path& def_path) override {
+        this->load_deinterleaved(ref_path, def_path);
+    }
+
+    void prepare_impl() override {
+        naive_gpu_n_to_mn<T, BENCH_TYPE, ALLOC>::prepare_impl();
+
+        for (auto & cuda_stream : cuda_streams_) {
+            CUCH(cudaStreamCreate(&cuda_stream));
+        }
+    }
+
+    void run_impl() override {
+        // Cannot use CUDA measure as we are using multiple streams
+        CPU_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_, true,
+                             start_kernels()
+        );
+    }
+
+    void free_impl() override {
+        for (auto & cuda_stream : cuda_streams_) {
+            CUCH(cudaStreamDestroy(cuda_stream));
+        }
+
+        naive_gpu_n_to_mn<T, BENCH_TYPE, ALLOC>::free_impl();
+    }
+
+    void store_results_impl(const std::filesystem::path& out_path) const override {
+        dsize_t num_groups = this->targets().num_matrices() / this->refs().num_matrices();
+        std::ofstream out{out_path};
+        this->results().store_interleaved_to_csv(out, num_groups);
+    }
+
+    [[nodiscard]] std::vector<const char*> measurement_labels_impl() const override {
+        return this->measure_alg() ?
+               std::vector<const char*>(std::begin(labels), std::end(labels)) :
+               std::vector<const char*>{};
+    }
+
+    data_array<T> load_valid_results(const std::filesystem::path& valid_data_path) const override {
+        // Deinterleave the results
+        return load_interleaved_matrix_array_from_csv<T, no_padding>(valid_data_path, this->refs().num_matrices());
+    }
+
+    data_array<T> compute_valid_results() const override {
+        dsize_t num_groups = this->targets().num_matrices() / this->refs().num_matrices();
+        // We need to pass num_groups as group_size to again interleave the targets, it makes it basically an inverse function
+        // We need to interleave them again as cpu implementation uses the original ordering
+        auto deinterleaved_targets = this->targets().template interleave<std::allocator<T>>(num_groups);
+
+        // We need to again deinterleave the results as it is compared to the deinterleaved results of our algorithm
+        return cpu_cross_corr_n_to_mn(this->refs(), deinterleaved_targets).interleave(this->refs().num_matrices());
+    }
+private:
+    inline static const char* labels[] = {
+        "Kernel"
+    };
+
+    std::vector<cudaStream_t> cuda_streams_;
+
+    dsize_t warps_per_thread_block_;
+    dsize_t right_rows_per_thread_;
+    dsize_t right_matrices_per_thread_;
+
+    void start_kernels() {
+        cuda_memset(this->d_results_, 0, this->results_.size());
+
+        dsize_t right_mats_per_left_mat = this->targets_.num_matrices() / this->refs_.num_matrices();
+        for (dsize_t ref = 0; ref < this->refs_.num_matrices(); ++ref) {
+            run_ccn_shuffle_multirow_right_multimat_right(
+                this->d_refs_ + ref * this->refs_.matrix_size().area(),
+                this->d_targets_ + (ref * right_mats_per_left_mat) * this->targets_.matrix_size().area(),
+                this->d_results_ + (ref * right_mats_per_left_mat) * this->results_.matrix_size().area(),
+                this->targets_.matrix_size(),
+                this->results_.matrix_size(),
+                right_mats_per_left_mat,
+                warps_per_thread_block_,
+                right_rows_per_thread_,
+                right_matrices_per_thread_,
+                cuda_streams_[ref % cuda_streams_.size()]
+            );
+        }
+    }
+};
+
+template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
+class naive_shuffle_multirow_both_multimat_right_n_to_mn: public naive_gpu_n_to_mn<T, BENCH_TYPE, ALLOC> {
+public:
+    explicit naive_shuffle_multirow_both_multimat_right_n_to_mn([[maybe_unused]] const json& args, std::chrono::nanoseconds min_measured_time)
+        :naive_gpu_n_to_mn<T, BENCH_TYPE, ALLOC>(std::size(labels), min_measured_time),
+         cuda_streams_()
+    {
+        warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
+        shifts_per_thread_right_matrix_ = args.value("shifts_per_thread_right_matrix", 4);
+        right_matrices_per_thread_ = args.value("right_matrices_per_thread", 4);
+        left_rows_per_iteration_ = args.value("left_rows_per_iteration", 4);
+
+        auto num_cuda_streams = args.value("num_cuda_streams", 8);
+
+        cuda_streams_.resize(num_cuda_streams);
+    }
+
+    [[nodiscard]] std::vector<std::pair<std::string, std::string>> additional_properties() const override {
+        return std::vector<std::pair<std::string, std::string>>{
+            std::make_pair("warps_per_thread_block", std::to_string(warps_per_thread_block_)),
+            std::make_pair("shifts_per_thread_right_matrix", std::to_string(shifts_per_thread_right_matrix_)),
+            std::make_pair("right_matrices_per_thread", std::to_string(right_matrices_per_thread_)),
+            std::make_pair("left_rows_per_iteration", std::to_string(left_rows_per_iteration_)),
+            std::make_pair("num_cuda_streams", std::to_string(cuda_streams_.size()))
+        };
+    }
+protected:
+    void load_impl(const std::filesystem::path& ref_path, const std::filesystem::path& def_path) override {
+        this->load_deinterleaved(ref_path, def_path);
+    }
+
+    void prepare_impl() override {
+        naive_gpu_n_to_mn<T, BENCH_TYPE, ALLOC>::prepare_impl();
+
+        for (auto & cuda_stream : cuda_streams_) {
+            CUCH(cudaStreamCreate(&cuda_stream));
+        }
+    }
+
+    void run_impl() override {
+        // Cannot use CUDA measure as we are using multiple streams
+        CPU_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_, true,
+            start_kernels();
+        );
+    }
+
+    void free_impl() override {
+        for (auto & cuda_stream : cuda_streams_) {
+            CUCH(cudaStreamDestroy(cuda_stream));
+        }
+
+        naive_gpu_n_to_mn<T, BENCH_TYPE, ALLOC>::free_impl();
+    }
+
+    void store_results_impl(const std::filesystem::path& out_path) const override {
+        dsize_t num_groups = this->targets().num_matrices() / this->refs().num_matrices();
+        std::ofstream out{out_path};
+        this->results().store_interleaved_to_csv(out, num_groups);
+    }
+
+    [[nodiscard]] std::vector<const char*> measurement_labels_impl() const override {
+        return this->measure_alg() ?
+               std::vector<const char*>(std::begin(labels), std::end(labels)) :
+               std::vector<const char*>{};
+    }
+
+    data_array<T> load_valid_results(const std::filesystem::path& valid_data_path) const override {
+        // Deinterleave the results
+        return load_interleaved_matrix_array_from_csv<T, no_padding>(valid_data_path, this->refs().num_matrices());
+    }
+
+    data_array<T> compute_valid_results() const override {
+        dsize_t num_groups = this->targets().num_matrices() / this->refs().num_matrices();
+        // We need to pass num_groups as group_size to again interleave the targets, it makes it basically an inverse function
+        // We need to interleave them again as cpu implementation uses the original ordering
+        auto deinterleaved_targets = this->targets().template interleave<std::allocator<T>>(num_groups);
+
+        // We need to again deinterleave the results as it is compared to the deinterleaved results of our algorithm
+        return cpu_cross_corr_n_to_mn(this->refs(), deinterleaved_targets).interleave(this->refs().num_matrices());
+    }
+private:
+    inline static const char* labels[] = {
+        "Kernel"
+    };
+
+    std::vector<cudaStream_t> cuda_streams_;
+
+    dsize_t warps_per_thread_block_;
+    dsize_t shifts_per_thread_right_matrix_;
+    dsize_t right_matrices_per_thread_;
+    dsize_t left_rows_per_iteration_;
+
+    void start_kernels() {
+        dsize_t right_mats_per_left_mat = this->targets_.num_matrices() / this->refs_.num_matrices();
+
+        for (dsize_t ref = 0; ref < this->refs_.num_matrices(); ++ref) {
+            run_ccn_shuffle_one_to_many_multirow_both_multimat_right(
+                this->d_refs_ + ref * this->refs_.matrix_size().area(),
+                this->d_targets_ + (ref * right_mats_per_left_mat) * this->targets_.matrix_size().area(),
+                this->d_results_ + (ref * right_mats_per_left_mat) * this->results_.matrix_size().area(),
+                this->targets_.matrix_size(),
+                this->results_.matrix_size(),
+                right_mats_per_left_mat,
+                warps_per_thread_block_,
+                shifts_per_thread_right_matrix_,
+                right_matrices_per_thread_,
+                left_rows_per_iteration_,
+                cuda_streams_[ref % cuda_streams_.size()]
+            );
+        }
+    }
+};
+
+template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
+class fft_original_alg_n_to_mn: public n_to_mn<T, BENCH_TYPE, ALLOC>, public fft_alg<T, ALLOC> {
 public:
     explicit fft_original_alg_n_to_mn([[maybe_unused]] const json& args, std::chrono::nanoseconds min_measured_time)
         :n_to_mn<T, BENCH_TYPE, ALLOC>(true, std::size(labels), min_measured_time),
@@ -347,7 +709,7 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
-class fft_reduced_transfer_n_to_mn: public n_to_mn<T, BENCH_TYPE, ALLOC> {
+class fft_reduced_transfer_n_to_mn: public n_to_mn<T, BENCH_TYPE, ALLOC>, public fft_alg<T, ALLOC> {
 public:
     explicit fft_reduced_transfer_n_to_mn([[maybe_unused]] const json& args, std::chrono::nanoseconds min_measured_time)
         :n_to_mn<T, BENCH_TYPE, ALLOC>(true, std::size(labels), min_measured_time),

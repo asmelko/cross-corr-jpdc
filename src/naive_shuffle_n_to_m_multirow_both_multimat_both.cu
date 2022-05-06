@@ -509,6 +509,9 @@ __device__ void n_to_m_shuffle_multirow_both_multimat_both_impl_shifts_dispatch(
     RES* __restrict__ res
 ) {
     if constexpr(NUM_SHIFTS_PER_RIGHT_MAT == 0) {
+        // Zero is a valid value, which happens when search_size is not divisible by
+        // block_size.z with remainder greater than 3
+
         // Silence the unused parameter warning
         (void)ctb;
         (void)warp;
@@ -517,7 +520,6 @@ __device__ void n_to_m_shuffle_multirow_both_multimat_both_impl_shifts_dispatch(
         (void)num_right_mats;
         (void)args;
         (void)res;
-        assert(false);
     } else {
         if (NUM_SHIFTS_PER_RIGHT_MAT == num_shifts_per_right_mat) {
             n_to_m_shuffle_multirow_both_multimat_both_impl_right_mats_dispatch<NUM_SHIFTS_PER_RIGHT_MAT, NUM_RIGHT_MATS, NUM_LEFT_MATS, LEFT_ROWS_PER_ITER, ATOMIC>(
