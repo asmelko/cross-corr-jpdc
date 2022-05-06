@@ -507,7 +507,8 @@ __host__ void ccn_warp_per_shift_shared_mem_right_mats_dispatch(
     dsize_t shared_mem_rows,
     dsize_t right_matrices_per_block,
     bool strided_load,
-    bool column_group_per_block
+    bool column_group_per_block,
+    cudaStream_t cuda_stream
 ) {
     if constexpr(MAX_RIGHT_MATRICES_PER_BLOCK > 0) {
         if (MAX_RIGHT_MATRICES_PER_BLOCK == right_matrices_per_block) {
@@ -527,7 +528,7 @@ __host__ void ccn_warp_per_shift_shared_mem_right_mats_dispatch(
             dsize_t shared_mem_size = (2 + right_matrices_per_block) * shared_mem_buffer_size;
 
             if (strided_load) {
-                ccn_warp_per_shift_shared_mem<MAX_RIGHT_MATRICES_PER_BLOCK, true><<<num_blocks, num_threads, shared_mem_size>>>(
+                ccn_warp_per_shift_shared_mem<MAX_RIGHT_MATRICES_PER_BLOCK, true><<<num_blocks, num_threads, shared_mem_size, cuda_stream>>>(
                     left,
                     right,
                     out,
@@ -538,7 +539,7 @@ __host__ void ccn_warp_per_shift_shared_mem_right_mats_dispatch(
                     shared_mem_rows
                 );
             } else {
-                ccn_warp_per_shift_shared_mem<MAX_RIGHT_MATRICES_PER_BLOCK, false><<<num_blocks, num_threads, shared_mem_size>>>(
+                ccn_warp_per_shift_shared_mem<MAX_RIGHT_MATRICES_PER_BLOCK, false><<<num_blocks, num_threads, shared_mem_size, cuda_stream>>>(
                     left,
                     right,
                     out,
@@ -562,7 +563,8 @@ __host__ void ccn_warp_per_shift_shared_mem_right_mats_dispatch(
                 shared_mem_rows,
                 right_matrices_per_block,
                 strided_load,
-                column_group_per_block
+                column_group_per_block,
+                cuda_stream
             );
         }
     } else {
@@ -581,6 +583,7 @@ __host__ void ccn_warp_per_shift_shared_mem_right_mats_dispatch(
         (void)right_matrices_per_block;
         (void)strided_load;
         (void)column_group_per_block;
+        (void)cuda_stream;
         assert(false);
     }
 }
@@ -601,7 +604,8 @@ void run_ccn_warp_per_shift_shared_mem(
     dsize_t shared_mem_rows,
     dsize_t right_matrices_per_block,
     bool strided_load,
-    bool column_group_per_block
+    bool column_group_per_block,
+    cudaStream_t cuda_stream = nullptr
 ) {
     if (shifts_per_cuda_block > 32) {
         throw std::runtime_error("Too many shifts per block: "s + std::to_string(shifts_per_cuda_block) + " (max 32)");
@@ -628,7 +632,8 @@ void run_ccn_warp_per_shift_shared_mem(
         shared_mem_rows,
         right_matrices_per_block,
         strided_load,
-        column_group_per_block
+        column_group_per_block,
+        cuda_stream
     );
 }
 
@@ -644,7 +649,8 @@ template void run_ccn_warp_per_shift_shared_mem<int, int>(
     dsize_t shared_mem_rows,
     dsize_t right_matrices_per_block,
     bool strided_load,
-    bool column_group_per_block
+    bool column_group_per_block,
+    cudaStream_t cuda_stream
 );
 
 template void run_ccn_warp_per_shift_shared_mem<float, float>(
@@ -659,7 +665,8 @@ template void run_ccn_warp_per_shift_shared_mem<float, float>(
     dsize_t shared_mem_rows,
     dsize_t right_matrices_per_block,
     bool strided_load,
-    bool column_group_per_block
+    bool column_group_per_block,
+    cudaStream_t cuda_stream
 );
 
 template void run_ccn_warp_per_shift_shared_mem<double, double>(
@@ -674,7 +681,8 @@ template void run_ccn_warp_per_shift_shared_mem<double, double>(
     dsize_t shared_mem_rows,
     dsize_t right_matrices_per_block,
     bool strided_load,
-    bool column_group_per_block
+    bool column_group_per_block,
+    cudaStream_t cuda_stream
 );
 
 }

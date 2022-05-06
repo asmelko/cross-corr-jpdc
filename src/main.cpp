@@ -387,6 +387,8 @@ std::unordered_map<std::string, std::function<int(
         {"nai_warp_per_shift_work_distribution_one_to_one", run_measurement<naive_warp_per_shift_work_distribution_one_to_one<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
         {"nai_warp_per_shift_shared_mem_one_to_one", run_measurement<naive_warp_per_shift_shared_mem_one_to_one<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
         {"nai_warp_per_shift_shared_mem_one_to_many", run_measurement<naive_warp_per_shift_shared_mem_one_to_many<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
+        {"nai_warp_per_shift_shared_mem_n_to_mn", run_measurement<naive_warp_per_shift_shared_mem_n_to_mn<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
+        {"nai_warp_per_shift_shared_mem_n_to_m", run_measurement<naive_warp_per_shift_shared_mem_n_to_m<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
         {"nai_block_per_shift_one_to_one", run_measurement<naive_block_per_shift_one_to_one<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
         {"fft_orig_one_to_one", run_measurement<fft_original_alg_one_to_one<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
         {"fft_reduced_transfer_one_to_one", run_measurement<fft_reduced_transfer_one_to_one<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},

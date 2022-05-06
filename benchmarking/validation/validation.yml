@@ -259,6 +259,15 @@ benchmark:
             left_rows_per_iteration: [1, 3, 4]
             num_cuda_streams: [2, 3, 8]
 
+        - name: nai_warp_per_shift_shared_mem
+          algorithm: nai_warp_per_shift_shared_mem_n_to_mn
+          args:
+            shifts_per_thread_block: [8, 9, 16, 32]
+            shared_mem_row_size: [32, 64, 128, 256]
+            strided_load: [true, false]
+            column_group_per_block: [true, false]
+            right_matrices_per_block: [1, 2, 3, 4]
+            num_cuda_streams: [1, 3, 4, 8]
 
         # The FFT algs have high max divergence for small values
         # - name: fft_orig
@@ -357,6 +366,15 @@ benchmark:
             right_matrices_per_thread: [1, 3, 4]
             left_rows_per_iteration_: [1, 3, 4]
 
+        - name: nai_warp_per_shift_shared_mem
+          algorithm: nai_warp_per_shift_shared_mem_n_to_m
+          args:
+            shifts_per_thread_block: [8, 9, 16, 32]
+            shared_mem_row_size: [32, 64, 128, 256]
+            strided_load: [true, false]
+            column_group_per_block: [true, false]
+            right_matrices_per_block: [1, 2, 3, 4]
+            num_cuda_streams: [1, 3, 4, 8]
         # The FFT algs have high max divergence for small values
         # - name: fft_better
         #   algorithm: fft_better_n_to_m

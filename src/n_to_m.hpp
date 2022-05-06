@@ -146,7 +146,7 @@ template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T
 class naive_original_alg_n_to_m: public naive_gpu_n_to_m<T, BENCH_TYPE, ALLOC> {
 public:
     explicit naive_original_alg_n_to_m(const json& args, std::chrono::nanoseconds min_measured_time)
-        :naive_gpu_n_to_m<T, BENCH_TYPE, ALLOC>(0, min_measured_time),
+        :naive_gpu_n_to_m<T, BENCH_TYPE, ALLOC>(std::size(labels), min_measured_time),
             cuda_streams_()
     {
         auto num_cuda_streams = args.value("num_cuda_streams", 8);
@@ -169,7 +169,10 @@ protected:
     }
 
     void run_impl() override {
-         start_kernels();
+        // Cannot use CUDA measure as we are using multiple streams
+        CPU_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_, true,
+                             start_kernels();
+        );
     }
 
     void free_impl() override {
@@ -181,6 +184,10 @@ protected:
     }
 
 private:
+    inline static const char* labels[] = {
+        "Kernel"
+    };
+
     std::vector<cudaStream_t> cuda_streams_;
 
     void start_kernels() {
@@ -204,7 +211,7 @@ template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T
 class naive_shuffle_multimat_right_work_distribution_n_to_m: public naive_gpu_n_to_m<T, BENCH_TYPE, ALLOC> {
 public:
     explicit naive_shuffle_multimat_right_work_distribution_n_to_m([[maybe_unused]] const json& args, std::chrono::nanoseconds min_measured_time)
-        :naive_gpu_n_to_m<T, BENCH_TYPE, ALLOC>(0, min_measured_time),
+        :naive_gpu_n_to_m<T, BENCH_TYPE, ALLOC>(std::size(labels), min_measured_time),
             cuda_streams_()
     {
         warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
@@ -237,17 +244,19 @@ protected:
     }
 
     void run_impl() override {
-        switch (distribution_type_) {
-            case distribution::none:
-                start_kernels<no_distribution>();
-                break;
-            case distribution::rectangle:
-                start_kernels<rectangle_distribution>();
-                break;
-            case distribution::triangle:
-                start_kernels<triangle_distribution>();
-                break;
-        }
+        CPU_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_, true,
+            switch (distribution_type_) {
+                case distribution::none:
+                    start_kernels<no_distribution>();
+                    break;
+                case distribution::rectangle:
+                    start_kernels<rectangle_distribution>();
+                    break;
+                case distribution::triangle:
+                    start_kernels<triangle_distribution>();
+                    break;
+            }
+        );
     }
 
     void free_impl() override {
@@ -259,6 +268,10 @@ protected:
     }
 
 private:
+    inline static const char* labels[] = {
+        "Kernel"
+    };
+
     std::vector<cudaStream_t> cuda_streams_;
 
     dsize_t warps_per_thread_block_;
@@ -500,6 +513,117 @@ private:
     dsize_t left_matrices_per_thread_;
     dsize_t right_matrices_per_thread_;
     dsize_t left_rows_per_iteration_;
+};
+template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
+class naive_warp_per_shift_shared_mem_n_to_m: public naive_gpu_n_to_m<T, BENCH_TYPE, ALLOC> {
+public:
+    explicit naive_warp_per_shift_shared_mem_n_to_m([[maybe_unused]] const json& args, std::chrono::nanoseconds min_measured_time)
+        :naive_gpu_n_to_m<T, BENCH_TYPE, ALLOC>(std::size(labels), min_measured_time),
+         cuda_streams_()
+    {
+        shifts_per_thread_block_ = args.value(SHIFTS_PER_THREAD_BLOCK_ARG, 16);
+        shared_mem_row_size_ = args.value(SHARED_MEM_ROW_SIZE_ARG, 32);
+        shared_mem_rows_ = args.value(SHARED_MEM_ROWS_ARG, shifts_per_thread_block_);
+        strided_load_ = args.value(STRIDED_LOAD_ARG, true);
+        column_group_per_block_ = args.value(COLUMN_GROUP_PER_BLOCK_ARG, false);
+        right_matrices_per_block_ = args.value(RIGHT_MATRICES_PER_BLOCK_ARG, 8);
+
+        if (shared_mem_rows_ == 0) {
+            shared_mem_rows_ = shifts_per_thread_block_;
+        }
+
+        // TODO: Remove this if we change the implementation to work with fewer
+        //  shared mem rows than shifts per block
+        if (shared_mem_rows_ < shifts_per_thread_block_) {
+            throw argument_error("Invalid number of shared memory rows ["s +
+                                 std::to_string(shared_mem_rows_) +
+                                 "], must be greater than shifts per block [" +
+                                 std::to_string(shifts_per_thread_block_) +
+                                 "]",
+                                 SHARED_MEM_ROWS_ARG);
+        }
+
+        auto num_cuda_streams = args.value(NUM_CUDA_STREAMS_ARG, 8);
+
+        cuda_streams_.resize(num_cuda_streams);
+    }
+
+    [[nodiscard]] std::vector<std::pair<std::string, std::string>> additional_properties() const override {
+        return std::vector<std::pair<std::string, std::string>>{
+            std::make_pair(SHIFTS_PER_THREAD_BLOCK_ARG, std::to_string(shifts_per_thread_block_)),
+            std::make_pair(SHARED_MEM_ROW_SIZE_ARG, std::to_string(shared_mem_row_size_)),
+            std::make_pair(SHARED_MEM_ROWS_ARG, std::to_string(shared_mem_rows_)),
+            std::make_pair(STRIDED_LOAD_ARG, std::to_string(strided_load_)),
+            std::make_pair(COLUMN_GROUP_PER_BLOCK_ARG, std::to_string(column_group_per_block_)),
+            std::make_pair(RIGHT_MATRICES_PER_BLOCK_ARG, std::to_string(right_matrices_per_block_)),
+            std::make_pair(NUM_CUDA_STREAMS_ARG, std::to_string(cuda_streams_.size()))
+        };
+    }
+protected:
+    void prepare_impl() override {
+        naive_gpu_n_to_m<T, BENCH_TYPE, ALLOC>::prepare_impl();
+
+        for (auto& cuda_stream : cuda_streams_) {
+            CUCH(cudaStreamCreate(&cuda_stream));
+        }
+    }
+
+    void run_impl() override {
+        // Cannot use CUDA measure as we are using multiple streams
+        CPU_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_, true,
+                             start_kernels();
+        );
+    }
+
+    void free_impl() override {
+        for (auto & cuda_stream : cuda_streams_) {
+            CUCH(cudaStreamDestroy(cuda_stream));
+        }
+
+        naive_gpu_n_to_m<T, BENCH_TYPE, ALLOC>::free_impl();
+    }
+
+private:
+    inline static const char* labels[] = {
+        "Kernel"
+    };
+
+    std::vector<cudaStream_t> cuda_streams_;
+
+    inline static const char* SHIFTS_PER_THREAD_BLOCK_ARG = "shifts_per_thread_block";
+    inline static const char* SHARED_MEM_ROW_SIZE_ARG = "shared_mem_row_size";
+    inline static const char* SHARED_MEM_ROWS_ARG = "shared_mem_rows";
+    inline static const char* STRIDED_LOAD_ARG = "strided_load";
+    inline static const char* COLUMN_GROUP_PER_BLOCK_ARG = "column_group_per_block";
+    inline static const char* RIGHT_MATRICES_PER_BLOCK_ARG = "right_matrices_per_block";
+    inline static const char* NUM_CUDA_STREAMS_ARG = "num_cuda_streams";
+
+    dsize_t shifts_per_thread_block_;
+    dsize_t shared_mem_row_size_;
+    dsize_t shared_mem_rows_;
+    dsize_t right_matrices_per_block_;
+    bool strided_load_;
+    bool column_group_per_block_;
+
+    void start_kernels() {
+        for (dsize_t ref = 0; ref < this->refs_.num_matrices(); ++ref) {
+            run_ccn_warp_per_shift_shared_mem(
+                this->d_refs_ + ref * this->refs_.matrix_size().area(),
+                this->d_targets_,
+                this->d_results_ + (ref * this->targets_.num_matrices()) * this->results_.matrix_size().area(),
+                this->targets_.matrix_size(),
+                this->results_.matrix_size(),
+                this->targets_.num_matrices(),
+                shifts_per_thread_block_,
+                shared_mem_row_size_,
+                shared_mem_rows_,
+                right_matrices_per_block_,
+                strided_load_,
+                column_group_per_block_,
+                cuda_streams_[ref % cuda_streams_.size()]
+            );
+        }
+    }
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>

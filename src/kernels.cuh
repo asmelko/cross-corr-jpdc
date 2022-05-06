@@ -132,7 +132,8 @@ void run_ccn_warp_per_shift_shared_mem(
     dsize_t shared_mem_rows,
     dsize_t right_matrices_per_block,
     bool strided_load,
-    bool column_group_per_block
+    bool column_group_per_block,
+    cudaStream_t cuda_stream = nullptr
 );
 
 template<typename DIST, typename T, typename RES>
