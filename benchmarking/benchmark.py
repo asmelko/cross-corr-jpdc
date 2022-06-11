@@ -8,7 +8,7 @@ import json
 
 import input_generator
 
-from typing import List, Tuple, Optional, Dict, Any
+from typing import List, Tuple, Optional, Dict, Set, Any, TextIO
 from pathlib import Path
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -370,24 +370,46 @@ class GlobalConfig:
 
 
 class Logger:
-    def __init__(self, num_steps: int, verbose: bool, failure_log_path: Path):
+    def __init__(self, num_steps: int, verbose: bool, log_stream: TextIO, failure_log_stream: TextIO):
         self.num_steps = num_steps
         self.step = 1
         self.verbose = verbose
-        self.failure_log_path = failure_log_path
+        self.log_stream = log_stream
+        self.failure_log_stream = failure_log_stream
         self.last_msg = ""
-
-    def __enter__(self):
-        self.failure_log = self.failure_log_path.open("a")
-        return self
-
-    def __exit__(self, type, value, traceback):
-        self.failure_log.close()
 
     def log_step(self, message: str, *, skip=False) -> None:
         skip_message = " SKIP:" if skip else ""
-        print(f"[{self.step}/{self.num_steps}]{skip_message} {message}")
+        self.log(f"[{self.step}/{self.num_steps}]{skip_message} {message}")
         self.step += 1
+
+    @staticmethod
+    def get_failed_runs(failure_log_path: Path) -> Dict[int, Dict[int, Set[str]]]:
+        """
+        Returns dictionary of dictionaries of sets, with first indexed by input index,
+        second by run index and third containing run names. This is to make
+        each contains query as fast as possible.
+
+        TODO: We should add intermeddiate run_group class aggregating the runs with the same index
+            currently if we provide a range of arg values in run definition, we get several runs
+            with the same run idx, which currently differ only in the full name which contains the
+            argument values
+
+        :param failure_log_path:
+        :return: Dictionary with input index as key, containing nested dictionary with run_idx as key,
+            which finally contains a Set of run names
+        """
+        try:
+            data = yaml.load(failure_log_path)
+            failed_runs = map(lambda entry: (int(entry["input"]["idx"]), int(entry["run"]["idx"]), str(entry["run"]["name"])), data)
+
+            d = {}
+            for in_idx, run_idx, run_name in failed_runs:
+                d.setdefault(in_idx, {}).setdefault(run_idx, set()).add(run_name)
+
+            return d
+        except FileNotFoundError:
+            return {}
 
     def log_failure(
             self,
@@ -409,14 +431,14 @@ class Logger:
             },
             "error": error.to_dict(),
         }]
-        yaml.dump(data, self.failure_log)
+        yaml.dump(data, self.failure_log_stream)
 
     def log(self, message):
-        print(message)
+        print(message, file=self.log_stream)
         self.last_msg = message
 
     def underline_last_message(self):
-        print("-"*len(self.last_msg))
+        print("-"*len(self.last_msg), file=self.log_stream)
 
 
 class InputSizeSubgroup:
@@ -496,13 +518,14 @@ class InputSizeSubgroup:
 
         return out_data_dir, measurement_results_path, measurement_output_stats_path
 
-    def execute_runs(self):
+    def execute_runs(self, previous_failed_runs: Dict[int, Set[str]]):
         for run in self.group.runs:
             out_data_dir, measurement_results_path, measurement_output_stats_path = \
                 self.get_run_result_paths(run)
 
-            measure = self.group.benchmark_type.lower() != "none"
-            validate = self.validation_data_path is not None
+            previous_failure = run.name in previous_failed_runs.get(run.idx, set())
+            measure = (self.group.benchmark_type.lower() != "none") and (not previous_failure)
+            validate = (self.validation_data_path is not None) and (not previous_failure)
 
             skip = ((measurement_results_path.exists() or not measure) and
                     (measurement_output_stats_path.exists() or not validate))
@@ -535,9 +558,11 @@ class InputSizeSubgroup:
                     self.logger.log(f"Measured times: {str(measurement_results_path.absolute())}")
                 if validate:
                     self.logger.log(f"Result data stats: {str(measurement_output_stats_path.absolute())}")
+                if previous_failure:
+                    self.logger.log(f"Run previously failed, see {str(self.group_execution.failure_log_path.absolute())}")
             except execution_error.ExecutionError as e:
                 self.logger.log_failure(run, e, self.index, self.input_size, self.left_path, self.right_path)
-                self.logger.log(f"Run failed, see {str(self.logger.failure_log_path.absolute())}")
+                self.logger.log(f"Run failed, see {str(self.group_execution.failure_log_path.absolute())}")
             self.logger.underline_last_message()
 
 
@@ -578,7 +603,12 @@ class GroupExecution:
     def run(self, verbose: bool, valid: Optional[validator.Validator]):
         # + 2* once for generating inputs, once for generating validation data, even if skipped
         num_steps = len(self.group.sizes) * len(self.group.runs) + 2 * len(self.group.sizes)
-        with Logger(num_steps, verbose, self.failure_log_path) as logger:
+
+        # Parse failure log, creating a set of runs to skip for each input
+        previous_failed_runs = Logger.get_failed_runs(self.failure_log_path)
+
+        with self.failure_log_path.open("a") as failure_log:
+            logger = Logger(num_steps, verbose, sys.stdout, failure_log)
             for input_idx, in_size in enumerate(self.group.sizes):
                 subgroup = InputSizeSubgroup.generate_inputs(
                     self.group,
@@ -589,7 +619,9 @@ class GroupExecution:
                     valid
                 )
 
-                subgroup.execute_runs()
+                failed_runs = previous_failed_runs.get(input_idx, {})
+
+                subgroup.execute_runs(failed_runs)
 
 
 class Group:
