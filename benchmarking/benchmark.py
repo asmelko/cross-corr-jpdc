@@ -20,7 +20,7 @@ from external import input_size, validator, executable, benchmark_script, execut
 DEFAULT_OUTPUT_PATH = Path.cwd() / "output"
 DEFAULT_ITERATIONS = 100
 
-yaml = YAML(typ='safe', pure=True)
+yaml = YAML(typ='safe')
 
 
 class ExistingResultsPolicy(Enum):
