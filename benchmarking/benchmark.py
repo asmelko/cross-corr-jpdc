@@ -401,6 +401,11 @@ class Logger:
         """
         try:
             data = yaml.load(failure_log_path)
+
+            # Empty failed runs file
+            if data is None:
+                return {}
+
             failed_runs = map(lambda entry: (int(entry["input"]["idx"]), int(entry["run"]["idx"]), str(entry["run"]["name"])), data)
 
             d = {}
