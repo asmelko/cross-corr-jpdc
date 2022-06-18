@@ -318,7 +318,7 @@ benchmark:
         - name: nai_shuffle_multirow_both_multimat_both
           algorithm: nai_shuffle_multirow_both_multimat_both_n_to_m
           args:
-            warps_per_thread_block: [8, 16]
+            warps_per_thread_block: [2, 4, 8]
             shifts_per_thread_right_matrix: [2, 4]
             left_matrices_per_thread: [2, 4]
             right_matrices_per_thread: [2, 4]
