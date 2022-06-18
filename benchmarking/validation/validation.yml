@@ -364,7 +364,7 @@ benchmark:
             shifts_per_thread_right_matrix: [1, 3, 4]
             left_matrices_per_thread: [1, 3, 4]
             right_matrices_per_thread: [1, 3, 4]
-            left_rows_per_iteration_: [1, 3, 4]
+            left_rows_per_iteration: [1, 3, 4]
 
         - name: nai_warp_per_shift_shared_mem
           algorithm: nai_warp_per_shift_shared_mem_n_to_m

@@ -11,6 +11,7 @@
 #include "shared_mem.cuh"
 
 #include "warp_size.hpp"
+#include "kernel_args.hpp"
 
 namespace cg = cooperative_groups;
 
@@ -514,6 +515,47 @@ __global__ void ccn_shuffle_multirow_right_multimat_right(
     );
 }
 
+/**
+ * Args used for the kernel call. The class is a singleton to minimize the impact
+ * on measured time (prevent allocation etc.)
+ */
+class ccn_shuffle_multirow_right_multimat_right_kernel_args : public kernel_args {
+public:
+    dsize_t max_right_rows_per_thread_;
+    dsize_t max_right_matrices_per_thread_;
+
+    ccn_shuffle_multirow_right_multimat_right_kernel_args(const ccn_shuffle_multirow_right_multimat_right_kernel_args&) = delete;
+    ccn_shuffle_multirow_right_multimat_right_kernel_args& operator=(ccn_shuffle_multirow_right_multimat_right_kernel_args&) = delete;
+
+    static void record_launch(
+        dim3 block_size,
+        dim3 grid_size,
+        dsize_t shared_mem_bytes,
+        dsize_t max_right_rows_per_thread,
+        dsize_t max_right_matrices_per_thread
+    ) {
+        static ccn_shuffle_multirow_right_multimat_right_kernel_args instance;
+        instance.set_common(block_size, grid_size, shared_mem_bytes);
+        instance.max_right_rows_per_thread_ = max_right_rows_per_thread;
+        instance.max_right_matrices_per_thread_ = max_right_matrices_per_thread;
+        set_last_kernel_launch_args(&instance);
+    }
+
+    [[nodiscard]] std::unordered_map<std::string, std::string> get_additional_args() const override {
+        return std::unordered_map<std::string, std::string>{
+            {"max_right_rows_per_thread", std::to_string(max_right_rows_per_thread_)},
+            {"max_right_matrices_per_thread", std::to_string(max_right_matrices_per_thread_)}
+        };
+    }
+
+private:
+    ccn_shuffle_multirow_right_multimat_right_kernel_args()
+        : kernel_args(),
+          max_right_rows_per_thread_(0),
+          max_right_matrices_per_thread_(0)
+    { }
+};
+
 template<dsize_t MAX_RIGHT_ROWS_PER_THREAD, dsize_t MAX_RIGHT_MATRICES_PER_THREAD, typename T, typename RES>
 __host__ void ccn_shuffle_multirow_right_multimat_right_mat_disptach(
     const T* __restrict__ left,
@@ -549,6 +591,14 @@ __host__ void ccn_shuffle_multirow_right_multimat_right_mat_disptach(
                 matrix_size,
                 search_size,
                 num_right_matrices
+            );
+
+            ccn_shuffle_multirow_right_multimat_right_kernel_args::record_launch(
+                num_threads,
+                num_blocks,
+                shared_mem_size,
+                MAX_RIGHT_ROWS_PER_THREAD,
+                MAX_RIGHT_MATRICES_PER_THREAD
             );
         } else {
             ccn_shuffle_multirow_right_multimat_right_mat_disptach<MAX_RIGHT_ROWS_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD - 1>(

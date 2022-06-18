@@ -5,6 +5,7 @@
 
 #include "types.cuh"
 #include "cuda_helpers.cuh"
+#include "kernel_args.hpp"
 
 namespace cg = cooperative_groups;
 
@@ -100,6 +101,30 @@ __global__ void cross_corr_naive_original(
     }
 }
 
+/**
+ * Args used for the kernel call. The class is a singleton to minimize the impact
+ * on measured time (prevent allocation etc.)
+ */
+class cross_corr_naive_original_kernel_args : public kernel_args {
+public:
+    cross_corr_naive_original_kernel_args(const cross_corr_naive_original_kernel_args&) = delete;
+    cross_corr_naive_original_kernel_args& operator=(cross_corr_naive_original_kernel_args&) = delete;
+
+    static void record_launch(
+        dim3 block_size,
+        dim3 grid_size
+    ) {
+        static cross_corr_naive_original_kernel_args instance;
+        instance.set_common(block_size, grid_size, 0);
+        set_last_kernel_launch_args(&instance);
+    }
+
+private:
+    cross_corr_naive_original_kernel_args()
+        : kernel_args()
+    { }
+};
+
 } // END anonymous namespace
 
 template<typename T, typename RES>
@@ -127,6 +152,11 @@ void run_cross_corr_naive_original(
         search_size,
         subregions_per_pic,
         batch_size
+    );
+
+    cross_corr_naive_original_kernel_args::record_launch(
+        num_threads,
+        num_blocks
     );
 }
 

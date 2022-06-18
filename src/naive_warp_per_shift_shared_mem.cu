@@ -10,6 +10,7 @@
 #include "cuda_helpers.cuh"
 #include "shared_mem.cuh"
 #include "warp_size.hpp"
+#include "kernel_args.hpp"
 
 namespace cg = cooperative_groups;
 
@@ -494,6 +495,47 @@ __global__ void ccn_warp_per_shift_shared_mem(
     }
 }
 
+/**
+ * Args used for the kernel call. The class is a singleton to minimize the impact
+ * on measured time (prevent allocation etc.)
+ */
+class ccn_warp_per_shift_shared_mem_kernel_args : public kernel_args {
+public:
+    dsize_t max_right_matrices_per_block_;
+    bool strided_load_;
+
+    ccn_warp_per_shift_shared_mem_kernel_args(const ccn_warp_per_shift_shared_mem_kernel_args&) = delete;
+    ccn_warp_per_shift_shared_mem_kernel_args& operator=(ccn_warp_per_shift_shared_mem_kernel_args&) = delete;
+
+    static void record_launch(
+        dim3 block_size,
+        dim3 grid_size,
+        dsize_t shared_mem_bytes,
+        dsize_t max_right_matrices_per_block,
+        bool strided_load
+    ) {
+        static ccn_warp_per_shift_shared_mem_kernel_args instance;
+        instance.set_common(block_size, grid_size, shared_mem_bytes);
+        instance.max_right_matrices_per_block_ = max_right_matrices_per_block;
+        instance.strided_load_ = strided_load;
+        set_last_kernel_launch_args(&instance);
+    }
+
+    [[nodiscard]] std::unordered_map<std::string, std::string> get_additional_args() const override {
+        return std::unordered_map<std::string, std::string>{
+            {"max_right_matrices_per_block", std::to_string(max_right_matrices_per_block_)},
+            {"strided_load", std::to_string(strided_load_)}
+        };
+    }
+
+private:
+    ccn_warp_per_shift_shared_mem_kernel_args()
+        : kernel_args(),
+          max_right_matrices_per_block_(0),
+          strided_load_(false)
+    { }
+};
+
 template<dsize_t MAX_RIGHT_MATRICES_PER_BLOCK, typename T, typename RES>
 __host__ void ccn_warp_per_shift_shared_mem_right_mats_dispatch(
     const T* __restrict__ left,
@@ -550,6 +592,15 @@ __host__ void ccn_warp_per_shift_shared_mem_right_mats_dispatch(
                     shared_mem_rows
                 );
             }
+
+            ccn_warp_per_shift_shared_mem_kernel_args::record_launch(
+                num_threads,
+                num_blocks,
+                shared_mem_size,
+                MAX_RIGHT_MATRICES_PER_BLOCK,
+                strided_load
+            );
+
         } else {
             ccn_warp_per_shift_shared_mem_right_mats_dispatch<MAX_RIGHT_MATRICES_PER_BLOCK - 1>(
                 left,

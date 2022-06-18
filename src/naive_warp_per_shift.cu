@@ -9,6 +9,8 @@
 #include "cuda_helpers.cuh"
 #include "row_distribution.cuh"
 #include "warp_size.hpp"
+#include "kernel_args.hpp"
+
 
 namespace cg = cooperative_groups;
 
@@ -241,6 +243,65 @@ __global__ void ccn_warp_per_shift_simple_indexing(
     }
 }
 
+/**
+ * Args used for the kernel call. The class is a singleton to minimize the impact
+ * on measured time (prevent allocation etc.)
+ */
+class warp_per_shift_kernel_args : public kernel_args {
+public:
+    warp_per_shift_kernel_args(const warp_per_shift_kernel_args&) = delete;
+    warp_per_shift_kernel_args& operator=(warp_per_shift_kernel_args&) = delete;
+
+    static void record_launch(
+        dim3 block_size,
+        dim3 grid_size
+    ) {
+        static warp_per_shift_kernel_args instance;
+        instance.set_common(block_size, grid_size, 0);
+        set_last_kernel_launch_args(&instance);
+    }
+
+private:
+    warp_per_shift_kernel_args()
+        : kernel_args()
+    { }
+};
+
+/**
+ * Args used for the kernel call. The class is a singleton to minimize the impact
+ * on measured time (prevent allocation etc.)
+ */
+class ccn_warp_per_shift_work_distribution_kernel_args : public kernel_args {
+public:
+    distribution dist_;
+
+    ccn_warp_per_shift_work_distribution_kernel_args(const ccn_warp_per_shift_work_distribution_kernel_args&) = delete;
+    ccn_warp_per_shift_work_distribution_kernel_args& operator=(ccn_warp_per_shift_work_distribution_kernel_args&) = delete;
+
+    static void record_launch(
+        dim3 block_size,
+        dim3 grid_size,
+        distribution dist
+    ) {
+        static ccn_warp_per_shift_work_distribution_kernel_args instance;
+        instance.set_common(block_size, grid_size, 0);
+        instance.dist_ = dist;
+        set_last_kernel_launch_args(&instance);
+    }
+
+    [[nodiscard]] std::unordered_map<std::string, std::string> get_additional_args() const override {
+        return std::unordered_map<std::string, std::string>{
+            {"work_distribution", to_string(dist_)}
+        };
+    }
+
+private:
+    ccn_warp_per_shift_work_distribution_kernel_args()
+        : kernel_args(),
+        dist_(distribution::none)
+    { }
+};
+
 } // END anonymous namespace
 
 template<typename T, typename RES>
@@ -269,6 +330,8 @@ void run_ccn_warp_per_shift(
         matrix_size,
         search_size
     );
+
+    warp_per_shift_kernel_args::record_launch(num_threads, num_blocks);
 }
 
 template<typename DIST, typename T, typename RES>
@@ -301,6 +364,8 @@ void run_ccn_warp_per_shift_work_distribution(
         search_size,
         max_rows_per_warp
     );
+
+    ccn_warp_per_shift_work_distribution_kernel_args::record_launch(num_threads, num_blocks, DIST::type);
 }
 
 template<typename T, typename RES>
@@ -329,6 +394,8 @@ void run_ccn_warp_per_shift_simple_indexing(
         matrix_size,
         search_size
     );
+
+    warp_per_shift_kernel_args::record_launch(num_threads, num_blocks);
 }
 
 template void run_ccn_warp_per_shift<int, int>(

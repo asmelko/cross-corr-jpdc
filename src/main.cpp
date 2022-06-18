@@ -24,6 +24,7 @@
 
 #include "argument_error.hpp"
 #include "host_helpers.hpp"
+#include "kernel_args.hpp"
 
 // Fix filesystem::path not working with program options when argument contains spaces
 // https://stackoverflow.com/questions/68716288/q-boost-program-options-using-stdfilesystempath-as-option-fails-when-the-gi
@@ -128,7 +129,8 @@ int run_computation_steps(
         logger.log("Allocating");
         alg.prepare();
     } catch (std::exception& e) {
-        std::cerr << "Exception occured durign allocation step: " << e.what() << std::endl;
+        std::cerr << "Exception occured durign allocation step: " << e.what() <<
+            "\nLast kernel launch arguments:\n" << last_kernel_launch_args_string() << std::endl;
         return 3;
     }
 
@@ -136,7 +138,8 @@ int run_computation_steps(
         logger.log("Transfering data");
         alg.transfer();
     } catch (std::exception& e) {
-        std::cerr << "Exception occured durign data transfer step: " << e.what() << std::endl;
+        std::cerr << "Exception occured durign data transfer step: " << e.what() <<
+             "\nLast kernel launch arguments:\n" << last_kernel_launch_args_string() << std::endl;
         return 3;
     }
 
@@ -144,7 +147,8 @@ int run_computation_steps(
         logger.log("Running test alg");
         alg.run();
     } catch (std::exception& e) {
-        std::cerr << "Exception occured durign computation step: " << e.what() << std::endl;
+        std::cerr << "Exception occured durign computation step: " << e.what() <<
+            "\nLast kernel launch arguments:\n" << last_kernel_launch_args_string() << std::endl;
         return 3;
     }
 
@@ -152,7 +156,8 @@ int run_computation_steps(
         logger.log("Copying output data to host");
         alg.finalize();
     } catch (std::exception& e) {
-        std::cerr << "Exception occured durign finalization step: " << e.what() << std::endl;
+        std::cerr << "Exception occured durign finalization step: " << e.what() <<
+            "\nLast kernel launch arguments:\n" << last_kernel_launch_args_string() << std::endl;
         return 3;
     }
 
@@ -160,7 +165,8 @@ int run_computation_steps(
         logger.log("Free resources");
         alg.free();
     } catch (std::exception& e) {
-        std::cerr << "Exception occured durign free step: " << e.what() << std::endl;
+        std::cerr << "Exception occured durign free step: " << e.what() <<
+            "\nLast kernel launch arguments:\n" << last_kernel_launch_args_string() << std::endl;
         return 3;
     }
 
@@ -177,7 +183,6 @@ void store_output(
     logger.log("Normalizing and storing results");
     fft_alg<typename ALG::data_type, typename ALG::allocator>& fft = alg;
     fft.store_results(out_path, normalize);
-
 }
 
 template<typename ALG>
@@ -264,7 +269,8 @@ int run_measurement(
             CUCH(cudaDeviceSynchronize());
             CUCH(cudaGetLastError());
         } catch (std::exception& e) {
-            std::cerr << "Exception somewhere in CUDA code: " << e.what() << std::endl;
+            std::cerr << "Exception somewhere in CUDA code: " << e.what() <<
+                "\nLast kernel launch arguments:\n" << last_kernel_launch_args_string() << std::endl;
             return 3;
         }
 
@@ -275,7 +281,8 @@ int run_measurement(
                     logger.log("Collect measurements");
                     alg.collect_measurements();
                 } catch (std::exception &e) {
-                    std::cerr << "Exception occured durign measurement collection step: " << e.what() << std::endl;
+                    std::cerr << "Exception occured durign measurement collection step: " << e.what() <<
+                        "\nLast kernel launch arguments:\n" << last_kernel_launch_args_string() << std::endl;
                     return 3;
                 }
             }
@@ -293,7 +300,8 @@ int run_measurement(
                     logger.log("Reset measurement");
                     alg.reset_measurements();
                 } catch (std::exception &e) {
-                    std::cerr << "Exception occured durign measurement reset step: " << e.what() << std::endl;
+                    std::cerr << "Exception occured durign measurement reset step: " << e.what() <<
+                        "\nLast kernel launch arguments:\n" << last_kernel_launch_args_string() << std::endl;
                     return 3;
                 }
             }
@@ -461,47 +469,6 @@ void print_help(std::ostream& out, const std::string& name, const po::options_de
     out << "\t" << name << " [global options] input [input options] <alg_type> <rows> <columns> <left_matrices> <right_matrices>\n";
     out << options;
 }
-
-//int main(int argc, char **argv) {
-//    if (argc != 2) {
-//        std::cerr << "Invalid number of arguments: " << argc << "\n";
-//        return 1;
-//    }
-//
-//    dsize_t group_size = std::stoi(argv[1]);
-//    {
-//        auto matrix = load_matrix_array_from_csv<float, no_padding>("test_mat.csv");
-//        std::ofstream out{"original_original.csv"};
-//        matrix.store_to_csv(out);
-//    }
-//
-//    {
-//        auto matrix = load_matrix_array_from_csv<float, no_padding>("test_mat.csv");
-//        std::ofstream out{"original_interleaved.csv"};
-//        matrix.store_interleaved_to_csv(out, matrix.num_matrices() / group_size);
-//    }
-//
-//    {
-//        auto matrix = load_interleaved_matrix_array_from_csv<float, no_padding>("test_mat.csv", group_size);
-//        std::ofstream out{"interleaved_original.csv"};
-//        matrix.store_to_csv(out);
-//    }
-//
-//    {
-//        auto matrix = load_interleaved_matrix_array_from_csv<float, no_padding>("test_mat.csv", group_size);
-//        std::ofstream out{"interleaved_interleaved.csv"};
-//        matrix.store_interleaved_to_csv(out, matrix.num_matrices() / group_size);
-//    }
-//
-//    {
-//        auto matrix = load_matrix_array_from_csv<float, no_padding>("test_mat.csv");
-//        std::ofstream out{"original_original_interleaved.csv"};
-//        matrix.interleave(group_size).store_to_csv(out);
-//    }
-//
-//
-//    return 0;
-//}
 
 int main(int argc, char **argv) {
     try {

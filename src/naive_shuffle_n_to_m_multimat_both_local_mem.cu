@@ -11,6 +11,7 @@
 
 #include "row_distribution.cuh"
 #include "warp_size.hpp"
+#include "kernel_args.hpp"
 
 namespace cg = cooperative_groups;
 
@@ -426,6 +427,51 @@ __global__ void ccn_shuffle_n_to_m_multimat_both_work_distribution(
     );
 }
 
+/**
+ * Args used for the kernel call. The class is a singleton to minimize the impact
+ * on measured time (prevent allocation etc.)
+ */
+class ccn_shuffle_n_to_m_multimat_both_work_distribution_kernel_args : public kernel_args {
+public:
+    dsize_t max_left_matrices_per_thread_;
+    dsize_t max_right_matrices_per_thread_;
+    distribution dist_;
+
+    ccn_shuffle_n_to_m_multimat_both_work_distribution_kernel_args(const ccn_shuffle_n_to_m_multimat_both_work_distribution_kernel_args&) = delete;
+    ccn_shuffle_n_to_m_multimat_both_work_distribution_kernel_args& operator=(ccn_shuffle_n_to_m_multimat_both_work_distribution_kernel_args&) = delete;
+
+    static void record_launch(
+        dim3 block_size,
+        dim3 grid_size,
+        dsize_t max_left_matrices_per_thread,
+        dsize_t max_right_matrices_per_thread,
+        distribution dist
+    ) {
+        static ccn_shuffle_n_to_m_multimat_both_work_distribution_kernel_args instance;
+        instance.set_common(block_size, grid_size, 0);
+        instance.max_left_matrices_per_thread_ = max_left_matrices_per_thread;
+        instance.max_right_matrices_per_thread_ = max_right_matrices_per_thread;
+        instance.dist_ = dist;
+        set_last_kernel_launch_args(&instance);
+    }
+
+    [[nodiscard]] std::unordered_map<std::string, std::string> get_additional_args() const override {
+        return std::unordered_map<std::string, std::string>{
+            {"max_left_matrices_per_thread", std::to_string(max_left_matrices_per_thread_)},
+            {"max_right_matrices_per_thread", std::to_string(max_right_matrices_per_thread_)},
+            {"work_distribution", to_string(dist_)}
+        };
+    }
+
+private:
+    ccn_shuffle_n_to_m_multimat_both_work_distribution_kernel_args()
+        : kernel_args(),
+          max_left_matrices_per_thread_(0),
+          max_right_matrices_per_thread_(0),
+          dist_(distribution::none)
+    { }
+};
+
 template<dsize_t MAX_LEFT_MATRICES_PER_THREAD, dsize_t MAX_RIGHT_MATRICES_PER_THREAD, typename DIST, typename T, typename RES>
 __host__ void ccn_shuffle_n_to_m_multimat_both_work_distribution_right_mat_dispatch(
     const T* __restrict__ left,
@@ -472,6 +518,14 @@ __host__ void ccn_shuffle_n_to_m_multimat_both_work_distribution_right_mat_dispa
                 num_left_matrices,
                 num_right_matrices,
                 max_rows_per_thread
+            );
+
+            ccn_shuffle_n_to_m_multimat_both_work_distribution_kernel_args::record_launch(
+                num_threads,
+                num_blocks,
+                MAX_LEFT_MATRICES_PER_THREAD,
+                MAX_RIGHT_MATRICES_PER_THREAD,
+                DIST::type
             );
         } else {
             ccn_shuffle_n_to_m_multimat_both_work_distribution_right_mat_dispatch<MAX_LEFT_MATRICES_PER_THREAD, MAX_RIGHT_MATRICES_PER_THREAD - 1, DIST>(

@@ -4,6 +4,7 @@
 
 #include "types.cuh"
 #include "cuda_helpers.cuh"
+#include "kernel_args.hpp"
 
 namespace cg = cooperative_groups;
 
@@ -44,6 +45,31 @@ __global__ void scatter(
     }
 }
 
+/**
+ * Args used for the kernel call. The class is a singleton to minimize the impact
+ * on measured time (prevent allocation etc.)
+ */
+class scatter_kernel_args : public kernel_args {
+public:
+    scatter_kernel_args(const scatter_kernel_args&) = delete;
+    scatter_kernel_args& operator=(scatter_kernel_args&) = delete;
+
+    static void record_launch(
+        dim3 block_size,
+        dim3 grid_size
+    ) {
+        static scatter_kernel_args instance;
+        instance.set_common(block_size, grid_size, 0);
+        set_last_kernel_launch_args(&instance);
+    }
+
+private:
+    scatter_kernel_args()
+        : kernel_args()
+    { }
+};
+
+
 } // END anonymous namespace
 
 template<typename T>
@@ -67,6 +93,11 @@ void run_scatter(
         src_num_matrices,
         dst_matrix_size,
         dst_pos
+    );
+
+    scatter_kernel_args::record_launch(
+        threads_per_block,
+        num_blocks
     );
 }
 

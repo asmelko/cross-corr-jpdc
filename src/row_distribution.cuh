@@ -6,6 +6,15 @@
 
 namespace cross {
 
+enum class distribution {
+    none,
+    rectangle,
+    triangle
+};
+
+distribution from_string(const std::string& val);
+std::string to_string(distribution dist);
+
 struct assigned_work {
     dsize_t output_row;
     dsize_t worker_idx;
@@ -23,6 +32,8 @@ __device__ __host__ T quadratic(
 }
 
 struct triangle_distribution {
+
+    constexpr static distribution type = distribution::triangle;
 
     inline static __host__ __device__ dsize_t num_workers_on_top_row(
         dsize_t max_rows_per_worker,
@@ -199,6 +210,8 @@ struct triangle_distribution {
 // Simple rectangle distribution with twice the amount of workers where half of them
 //  do no work and just immediately exit
 struct rectangle_distribution {
+    constexpr static distribution type = distribution::rectangle;
+
     inline static __host__ __device__ dsize_t max_workers_per_row(
         dsize_t max_rows_per_worker,
         dsize_t matrix_size_rows
@@ -246,6 +259,8 @@ struct rectangle_distribution {
  * which leads to better results.
  */
 struct no_distribution {
+    constexpr static distribution type = distribution::none;
+
     static __host__ dsize_t num_workers(
         [[maybe_unused]] dsize_t max_rows_per_worker,
         [[maybe_unused]] dsize_t matrix_size_rows,
@@ -267,17 +282,5 @@ struct no_distribution {
         };
     }
 };
-
-enum class distribution {
-    none,
-    rectangle,
-    triangle
-};
-
-distribution from_string(const std::string& val);
-std::string to_string(distribution dist);
-
-
-
 
 }

@@ -4,6 +4,7 @@
 
 #include "types.cuh"
 #include "cuda_helpers.cuh"
+#include "kernel_args.hpp"
 
 namespace cg = cooperative_groups;
 
@@ -147,6 +148,29 @@ __global__ void hadamard_n_to_m_over_output(
     }
 }
 
+/**
+ * Args used for the kernel call. The class is a singleton to minimize the impact
+ * on measured time (prevent allocation etc.)
+ */
+class hadamard_kernel_args : public kernel_args {
+public:
+    hadamard_kernel_args(const hadamard_kernel_args&) = delete;
+    hadamard_kernel_args& operator=(hadamard_kernel_args&) = delete;
+
+    static void record_launch(
+        dim3 block_size,
+        dim3 grid_size
+    ) {
+        static hadamard_kernel_args instance;
+        instance.set_common(block_size, grid_size, 0);
+        set_last_kernel_launch_args(&instance);
+    }
+private:
+    hadamard_kernel_args()
+        : kernel_args()
+    { }
+};
+
 } // END anonymous namespace
 
 template<typename T>
@@ -160,6 +184,11 @@ void run_hadamard_original(
 ) {
     dsize_t num_blocks = div_up(subregion_size.area() * subregions_per_pic, threads_per_block);
     hadamard_original<<<num_blocks, threads_per_block>>>(ref, deformed, subregion_size, subregions_per_pic, batch_size);
+
+    hadamard_kernel_args::record_launch(
+        threads_per_block,
+        num_blocks
+    );
 }
 
 template<typename T>
@@ -185,6 +214,11 @@ void run_hadamard_n_to_m_over_right(
         matrix_size,
         left_num,
         right_num
+    );
+
+    hadamard_kernel_args::record_launch(
+        threads_per_block,
+        num_blocks
     );
 }
 
@@ -215,6 +249,11 @@ void run_hadamard_n_to_m_over_output(
         matrix_size,
         left_num,
         right_num
+    );
+
+    hadamard_kernel_args::record_launch(
+        threads_per_block,
+        num_blocks
     );
 }
 

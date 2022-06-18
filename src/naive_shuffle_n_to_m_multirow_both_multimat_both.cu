@@ -11,6 +11,7 @@
 
 #include "shared_mem.cuh"
 #include "warp_size.hpp"
+#include "kernel_args.hpp"
 
 namespace cg = cooperative_groups;
 
@@ -690,6 +691,57 @@ __global__ void ccn_n_to_m_shuffle_multirow_both_multimat_both(
     );
 }
 
+/**
+ * Args used for the kernel call. The class is a singleton to minimize the impact
+ * on measured time (prevent allocation etc.)
+ */
+class ccn_n_to_m_shuffle_multirow_both_multimat_both_kernel_args : public kernel_args {
+public:
+    dsize_t max_shifts_per_right_matrix_;
+    dsize_t max_right_matrices_per_thread_;
+    dsize_t max_left_matrices_per_thread_;
+    dsize_t left_rows_per_iter_;
+
+    ccn_n_to_m_shuffle_multirow_both_multimat_both_kernel_args(const ccn_n_to_m_shuffle_multirow_both_multimat_both_kernel_args&) = delete;
+    ccn_n_to_m_shuffle_multirow_both_multimat_both_kernel_args& operator=(ccn_n_to_m_shuffle_multirow_both_multimat_both_kernel_args&) = delete;
+
+    static void record_launch(
+        dim3 block_size,
+        dim3 grid_size,
+        dsize_t shared_mem_bytes,
+        dsize_t max_shifts_per_right_matrix,
+        dsize_t max_right_matrices_per_thread,
+        dsize_t max_left_matrices_per_thread,
+        dsize_t left_rows_per_iter
+    ) {
+        static ccn_n_to_m_shuffle_multirow_both_multimat_both_kernel_args instance;
+        instance.set_common(block_size, grid_size, shared_mem_bytes);
+        instance.max_shifts_per_right_matrix_ = max_shifts_per_right_matrix;
+        instance.max_right_matrices_per_thread_ = max_right_matrices_per_thread;
+        instance.max_left_matrices_per_thread_ = max_left_matrices_per_thread;
+        instance.left_rows_per_iter_ = left_rows_per_iter;
+        set_last_kernel_launch_args(&instance);
+    }
+
+    [[nodiscard]] std::unordered_map<std::string, std::string> get_additional_args() const override {
+        return std::unordered_map<std::string, std::string>{
+            {"max_shifts_per_right_matrix", std::to_string(max_shifts_per_right_matrix_)},
+            {"max_right_matrices_per_thread", std::to_string(max_right_matrices_per_thread_)},
+            {"max_left_matrices_per_thread", std::to_string(max_left_matrices_per_thread_)},
+            {"left_rows_per_iter", std::to_string(left_rows_per_iter_)}
+        };
+    }
+
+private:
+    ccn_n_to_m_shuffle_multirow_both_multimat_both_kernel_args()
+    : kernel_args(),
+        max_shifts_per_right_matrix_(0),
+        max_right_matrices_per_thread_(0),
+        max_left_matrices_per_thread_(0),
+        left_rows_per_iter_(0)
+    { }
+};
+
 template<dsize_t MAX_SHIFTS_PER_RIGHT_MATRIX, dsize_t MAX_RIGHT_MATRICES_PER_THREAD, dsize_t MAX_LEFT_MATRICES_PER_THREAD, dsize_t LEFT_ROWS_PER_ITER, typename T, typename RES>
 __host__ void ccn_n_to_m_shuffle_multirow_both_multimat_both_left_rows_dispatch(
     const T* __restrict__ left,
@@ -736,6 +788,16 @@ __host__ void ccn_n_to_m_shuffle_multirow_both_multimat_both_left_rows_dispatch(
                 search_size,
                 num_left_matrices,
                 num_right_matrices
+            );
+
+            ccn_n_to_m_shuffle_multirow_both_multimat_both_kernel_args::record_launch(
+                num_threads,
+                num_blocks,
+                shared_mem_size,
+                MAX_SHIFTS_PER_RIGHT_MATRIX,
+                MAX_RIGHT_MATRICES_PER_THREAD,
+                MAX_LEFT_MATRICES_PER_THREAD,
+                LEFT_ROWS_PER_ITER
             );
         } else {
             ccn_n_to_m_shuffle_multirow_both_multimat_both_left_rows_dispatch<MAX_SHIFTS_PER_RIGHT_MATRIX, MAX_RIGHT_MATRICES_PER_THREAD, MAX_LEFT_MATRICES_PER_THREAD, LEFT_ROWS_PER_ITER - 1>(
