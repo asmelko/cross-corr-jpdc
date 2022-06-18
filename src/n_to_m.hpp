@@ -183,6 +183,11 @@ protected:
         naive_gpu_n_to_m<T, BENCH_TYPE, ALLOC>::free_impl();
     }
 
+    [[nodiscard]] std::vector<const char*> measurement_labels_impl() const override {
+        return this->measure_alg() ?
+               std::vector<const char*>(std::begin(labels), std::end(labels)) :
+               std::vector<const char*>{};
+    }
 private:
     inline static const char* labels[] = {
         "Kernel"
@@ -265,6 +270,12 @@ protected:
         }
 
         naive_gpu_n_to_m<T, BENCH_TYPE, ALLOC>::free_impl();
+    }
+
+    [[nodiscard]] std::vector<const char*> measurement_labels_impl() const override {
+        return this->measure_alg() ?
+               std::vector<const char*>(std::begin(labels), std::end(labels)) :
+               std::vector<const char*>{};
     }
 
 private:
@@ -581,6 +592,12 @@ protected:
         }
 
         naive_gpu_n_to_m<T, BENCH_TYPE, ALLOC>::free_impl();
+    }
+
+    [[nodiscard]] std::vector<const char*> measurement_labels_impl() const override {
+        return this->measure_alg() ?
+               std::vector<const char*>(std::begin(labels), std::end(labels)) :
+               std::vector<const char*>{};
     }
 
 private:
