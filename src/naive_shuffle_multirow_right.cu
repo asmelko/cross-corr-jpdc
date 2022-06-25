@@ -8,7 +8,6 @@
 #include "types.cuh"
 #include "cuda_helpers.cuh"
 #include "bound_checked_loads.cuh"
-#include "shared_mem.cuh"
 
 #include "warp_size.hpp"
 #include "kernel_args.hpp"
@@ -88,14 +87,13 @@ __device__ warp_shuffle_impl_args<T, RES> create_warp_shuffle_impl_args(
     );
 }
 
-template<dsize_t NUM_RIGHT_ROWS, bool REVERSE_OUTPUT, dsize_t WARP_SIZE, typename T, typename RES>
+template<dsize_t NUM_RIGHT_ROWS, dsize_t MAX_NUM_RIGHT_ROWS, dsize_t SUM_START, dsize_t WARP_SIZE, typename T, typename RES>
 __device__ void compute_row_group(
-    const cg::thread_block& ctb,
     const cg::thread_block_tile<WARP_SIZE>& warp,
     warp_shuffle_impl_args<T, RES> args,
     dsize_t warp_y_right_start,
     int y_shift,
-    RES* __restrict__ res
+    RES (&sum)[MAX_NUM_RIGHT_ROWS]
 ) {
     dsize_t warp_y_left = warp_y_right_start + y_shift;
     const T* left_row = args.left + warp_y_left * args.matrix_size.x;
@@ -111,11 +109,6 @@ __device__ void compute_row_group(
         warp_x_left + warp.thread_rank(),
         args.matrix_size.x
     );
-
-    T sum[NUM_RIGHT_ROWS];
-    for (dsize_t r = 0; r < NUM_RIGHT_ROWS; ++r) {
-        sum[r] = 0;
-    }
 
     for (
         dsize_t warp_x_right = args.warp_right_start.x;
@@ -155,7 +148,14 @@ __device__ void compute_row_group(
                 // Broadcast
                 auto right_val = warp.shfl(thread_right[r], i);
 
-                sum[r] += thread_left_bottom * right_val;
+                // (NUM_RIGHT_ROWS - 1 - r) as the rows from the right matrix are loaded top to bottom
+                // but as we compute them agains last row from the left matrix they overlap with,
+                // the row 0 from the right matrix overlaps with the given row from the left matrix
+                // in overlap NUM_RIGHT_ROWS - 1 etc.
+                //
+                // The SUM_START is provided as during wind_down step with k rows, we need only the last
+                // k overlaps, not the first k
+                sum[SUM_START + NUM_RIGHT_ROWS - 1 - r] += thread_left_bottom * right_val;
             }
 
             // Shuffle does modulo srcLane automatically
@@ -166,17 +166,6 @@ __device__ void compute_row_group(
                 warp.thread_rank() + 1
             );
             thread_left_top = warp.shfl_down(thread_left_top, 1);
-        }
-    }
-
-    for (dsize_t r = 0; r < NUM_RIGHT_ROWS; ++r) {
-        // Res contains first the results of min_shift for all threads of the block,
-        // then results of min_shift + 1 for all threads of the block,
-        // up to the results of min_shift + NUM_RIGHT_ROWS in warp_shuffle_impl
-        if constexpr(REVERSE_OUTPUT) {
-            res[(NUM_RIGHT_ROWS - 1 - r) * ctb.size() + ctb.thread_rank()] += sum[r];
-        } else {
-            res[r * ctb.size() + ctb.thread_rank()] += sum[r];
         }
     }
 }
@@ -212,68 +201,66 @@ __device__ void compute_row_group(
  */
 template<int NUM_RIGHT_ROWS, dsize_t MAX_NUM_RIGHT_ROWS, dsize_t WARP_SIZE, typename T, typename RES>
 __device__ void startup(
-    const cg::thread_block& ctb,
     const cg::thread_block_tile<WARP_SIZE>& warp,
     warp_shuffle_impl_args<T, RES> args,
-    RES* __restrict__ res
+    RES (&sum)[MAX_NUM_RIGHT_ROWS]
 ) {
     if constexpr(NUM_RIGHT_ROWS < MAX_NUM_RIGHT_ROWS) {
         if (static_cast<int>(args.warp_right_start.y) + args.warp_min_shift.y + NUM_RIGHT_ROWS - 1 >= 0) {
-            compute_row_group<NUM_RIGHT_ROWS, true>(
-                ctb,
+            compute_row_group<NUM_RIGHT_ROWS, MAX_NUM_RIGHT_ROWS, 0>(
                 warp,
                 args,
                 args.warp_right_start.y,
                 args.warp_min_shift.y + NUM_RIGHT_ROWS - 1,
-                res
+                sum
             );
         }
-        startup<NUM_RIGHT_ROWS + 1, MAX_NUM_RIGHT_ROWS>(ctb, warp, args, res);
+        startup<NUM_RIGHT_ROWS + 1, MAX_NUM_RIGHT_ROWS>(warp, args, sum);
     } else {
         // Silence the unused parameter warning
-        (void)ctb;
         (void)warp;
         (void)args;
-        (void)res;
+        (void)sum;
     }
 }
 
 template<int NUM_RIGHT_ROWS, dsize_t MAX_NUM_RIGHT_ROWS, dsize_t WARP_SIZE, typename T, typename RES>
 __device__ void wind_down(
-    const cg::thread_block& ctb,
     const cg::thread_block_tile<WARP_SIZE>& warp,
     warp_shuffle_impl_args<T, RES> args,
-    RES* __restrict__ res
+    RES (&sum)[MAX_NUM_RIGHT_ROWS]
 ) {
     if constexpr(NUM_RIGHT_ROWS > 0) {
         if (args.warp_right_end.y - NUM_RIGHT_ROWS + args.warp_max_shift.y < args.matrix_size.y) {
-            compute_row_group<NUM_RIGHT_ROWS, true>(
-                ctb,
+            compute_row_group<NUM_RIGHT_ROWS, MAX_NUM_RIGHT_ROWS, MAX_NUM_RIGHT_ROWS - NUM_RIGHT_ROWS>(
                 warp,
                 args,
                 args.warp_right_end.y - NUM_RIGHT_ROWS,
                 args.warp_max_shift.y,
-                res + (MAX_NUM_RIGHT_ROWS - NUM_RIGHT_ROWS) * ctb.size()
+                sum
             );
         }
-        wind_down<NUM_RIGHT_ROWS - 1, MAX_NUM_RIGHT_ROWS>(ctb, warp, args, res);
+        wind_down<NUM_RIGHT_ROWS - 1, MAX_NUM_RIGHT_ROWS>(warp, args, sum);
     } else {
         // Silence the unused parameter warning
-        (void)ctb;
         (void)warp;
         (void)args;
-        (void)res;
+        (void)sum;
     }
 }
 
 template<dsize_t NUM_RIGHT_ROWS, bool ATOMIC, dsize_t WARP_SIZE, typename T, typename RES>
 __device__ void shuffle_multirow_right_impl(
-    const cg::thread_block& ctb,
     const cg::thread_block_tile<WARP_SIZE>& warp,
-    warp_shuffle_impl_args<T, RES> args,
-    RES* __restrict__ res
+    warp_shuffle_impl_args<T, RES> args
 ) {
-    startup<1, NUM_RIGHT_ROWS>(ctb, warp, args, res);
+
+    T sum[NUM_RIGHT_ROWS];
+    for (dsize_t r = 0; r < NUM_RIGHT_ROWS; ++r) {
+        sum[r] = 0;
+    }
+
+    startup<1, NUM_RIGHT_ROWS>(warp, args, sum);
 
     /*
      * The startup gets us to the situation where we have the first
@@ -286,17 +273,16 @@ __device__ void shuffle_multirow_right_impl(
     int end = args.warp_right_end.y - (NUM_RIGHT_ROWS - 1);
 
     for (int warp_y_right = args.warp_right_start.y; warp_y_right < end; warp_y_right += 1) {
-        compute_row_group<NUM_RIGHT_ROWS, true>(
-            ctb,
+        compute_row_group<NUM_RIGHT_ROWS, NUM_RIGHT_ROWS, 0>(
             warp,
             args,
             warp_y_right,
             args.warp_max_shift.y,
-            res
+            sum
         );
     }
 
-    wind_down<NUM_RIGHT_ROWS - 1, NUM_RIGHT_ROWS>(ctb, warp, args, res);
+    wind_down<NUM_RIGHT_ROWS - 1, NUM_RIGHT_ROWS>(warp, args, sum);
 
     auto first_output_offset = args.output_pos.linear_idx(args.search_size.x);
     RES* matrix = args.out;
@@ -305,11 +291,10 @@ __device__ void shuffle_multirow_right_impl(
     if (args.output_pos.x < args.search_size.x && args.output_pos.y < args.search_size.y) {
         for (dsize_t r = 0; r < NUM_RIGHT_ROWS; ++r) {
             auto output_offset = first_output_offset + r * args.search_size.x;
-            auto val = res[r * ctb.size() + ctb.thread_rank()];
             if constexpr(ATOMIC) {
-                atomicAdd(matrix + output_offset, val);
+                atomicAdd(matrix + output_offset, sum[r]);
             } else {
-                matrix[output_offset] = val;
+                matrix[output_offset] = sum[r];
             }
         }
     }
@@ -317,37 +302,29 @@ __device__ void shuffle_multirow_right_impl(
 
 template<dsize_t RIGHT_ROWS_PER_THREAD, bool ATOMIC, dsize_t WARP_SIZE, typename T, typename RES>
 __device__ void shuffle_multirow_right_impl_dispatch(
-    const cg::thread_block& ctb,
     const cg::thread_block_tile<WARP_SIZE>& warp,
     dsize_t right_rows_per_thread,
-    const warp_shuffle_impl_args<T, RES>& args,
-    RES* __restrict__ res
+    const warp_shuffle_impl_args<T, RES>& args
 ) {
     if constexpr(RIGHT_ROWS_PER_THREAD == 0) {
         // Zero is valid, if the warp is completely outside the result matrix
 
         // Silence the unused parameter warning
-        (void)ctb;
         (void)warp;
         (void)right_rows_per_thread;
         (void)args;
-        (void)res;
 
     } else {
         if (RIGHT_ROWS_PER_THREAD == right_rows_per_thread) {
             shuffle_multirow_right_impl<RIGHT_ROWS_PER_THREAD, ATOMIC>(
-                ctb,
                 warp,
-                args,
-                res
+                args
             );
         } else {
             shuffle_multirow_right_impl_dispatch<RIGHT_ROWS_PER_THREAD - 1, ATOMIC>(
-                ctb,
                 warp,
                 right_rows_per_thread,
-                args,
-                res
+                args
             );
         }
     }
@@ -367,27 +344,6 @@ __global__ void ccn_shuffle_multirow_right(
     dsize2_t matrix_size,
     dsize2_t search_size
 ) {
-    // Initialize by loading a warp worth of data from left matrix
-    // as we will be iterating over the left matrix
-
-    // Then broadcast from the right data in sequence from all threads
-    // With each broadcast, multiply and sum with the current value from
-    // left matrix and then shuffle down the used values from left matrix.
-    // Then shuffle the second warp worth of data from left matrix,
-    // passing the last thread the value that is shuffled out of the thread 0
-    // and would be forgotten
-    // basically with warp size 4, it will go
-    // 0 1 2 3 0 1 2 3, then 1 2 3 0 1 2 3 x, then 2 3 0 1 2 3 x x,
-    // each time broadcasting first from thread 0, then 1, then 2
-    // Once we get to 0 1 2 3 x x x x, we load one warp worth of values
-    // from both left and right matrices
-
-    // If the shift computed by the current thread does not overlap with the broadcast value
-    // that means it tries to read from the left matrix out of bounds and thus will read 0
-    // and ignore the broadcast value
-    // By shifting the values down, when it reaches the part that overlaps it will receive
-    // value shifted from the previous thread
-
     cg::thread_block ctb = cg::this_thread_block();
     cg::thread_block_tile<warp_size> warp = cg::tiled_partition<warp_size>(ctb);
 
@@ -442,13 +398,6 @@ __global__ void ccn_shuffle_multirow_right(
     dsize_t warp_y_right_start = max(-warp_max_shift.y, 0);
     dsize_t warp_y_right_end = min(matrix_size.y - warp_min_shift.y, matrix_size.y);
 
-
-    RES* res = shared_memory_proxy<RES>();
-    for (dsize_t i = ctb.thread_rank(); i < MAX_RIGHT_ROWS_PER_THREAD * ctb.size(); i += ctb.size()) {
-        res[i] = 0;
-    }
-    ctb.sync();
-
     // Max shift might be smaller than min shift if warp is completely outside the out matrix
     // +1 because max_shift is inclusive, it is the last shift computed by this warp
     // so to get the number of shifts with both sides inclusive, we need to add 1
@@ -468,11 +417,9 @@ __global__ void ccn_shuffle_multirow_right(
     );
 
     shuffle_multirow_right_impl_dispatch<MAX_RIGHT_ROWS_PER_THREAD, false>(
-        ctb,
         warp,
         warp_num_right_rows,
-        args,
-        res
+        args
     );
 }
 
@@ -529,9 +476,7 @@ __host__ void ccn_shuffle_multirow_right_dispatch(
                 div_up(search_size.y, num_threads.y * MAX_RIGHT_ROWS_PER_THREAD)
             );
 
-            dsize_t block_size = num_threads.x * num_threads.y;
-
-            ccn_shuffle_multirow_right<MAX_RIGHT_ROWS_PER_THREAD><<<num_blocks, num_threads, block_size * MAX_RIGHT_ROWS_PER_THREAD * sizeof(RES)>>>(
+            ccn_shuffle_multirow_right<MAX_RIGHT_ROWS_PER_THREAD><<<num_blocks, num_threads>>>(
                 left,
                 right,
                 out,
