@@ -106,12 +106,12 @@ namespace impl {
             if (it == tok.end()) {
                 throw std::runtime_error{"Missing matrix header"};
             }
-            dsize_t width = std::stoi(*it);
+            dsize_t num_rows = std::stoi(*it);
 
             if (++it == tok.end()) {
-                throw std::runtime_error("Missing matrix height");
+                throw std::runtime_error("Missing number of columns");
             }
-            dsize_t height = std::stoi(*it);
+            dsize_t num_columns = std::stoi(*it);
 
             dsize_t num_matrices = 1;
             if (++it != tok.end()) {
@@ -123,7 +123,7 @@ namespace impl {
             }
 
 
-            return {dsize2_t{width, height}, num_matrices};
+            return {dsize2_t{num_columns, num_rows}, num_matrices};
         }
 
         template <typename T, typename PADDING>
@@ -167,7 +167,7 @@ namespace impl {
         }
 
         inline void write_header(std::ostream& out, dsize2_t size, dsize_t num_matrices = 1) {
-            out << "# " << size.x << "," << size.y << "," << num_matrices << "\n";
+            out << "# " << size.y << "," << size.x << "," << num_matrices << "\n";
         }
 
         template <typename T>
