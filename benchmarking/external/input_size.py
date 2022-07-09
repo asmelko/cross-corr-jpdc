@@ -38,6 +38,8 @@ class InputSize:
 
     @classmethod
     def from_dict_or_string(cls, data) -> "InputSize":
+        # TODO: Separate input matrix size specification from number of matrices
+        # so that we can generate all possible combinations instead of writing them by hand
         if isinstance(data, str):
             return cls.from_string(data)
         elif isinstance(data, dict):

@@ -794,7 +794,7 @@ def parse_benchmark(
 ) -> Tuple[Path, List[Group]]:
     definition = parse_benchmark_config(benchmark_def_file)
     benchmark = definition["benchmark"]
-    name = benchmark["name"]
+    name = benchmark.get("name", benchmark_def_file.stem)
 
     base_dir_path = benchmark_def_file.parent
 

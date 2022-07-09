@@ -4,7 +4,7 @@
 #SBATCH -A kdsstudent
 #SBATCH -c 4
 #SBATCH --gpus volta:1
-#SBATCH --time=24:00:00
+#SBATCH --time=2-00:00:00
 #SBATCH --mem=64G
 #SBATCH --requeue
 
