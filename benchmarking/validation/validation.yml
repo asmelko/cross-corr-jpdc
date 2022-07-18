@@ -19,6 +19,18 @@ benchmark:
         - name: nai_orig
           algorithm: nai_orig_one_to_one
 
+        - name: nai_shuffle
+          algorithm: nai_shuffle_one_to_one
+          args:
+            warps_per_thread_block: [8, 9, 16, 32]
+
+        - name: nai_shuffle_work_distribution
+          algorithm: nai_shuffle_work_distribution_one_to_one
+          args:
+            warps_per_thread_block: [8, 9, 16, 32]
+            rows_per_thread: [1, 3, 5, 10, 20, 32, 64]
+            distribution_type: ["none", "rectangle", "triangle"]
+
         - name: nai_shuffle_multimat_right
           algorithm: nai_shuffle_multimat_right_one_to_one
           args:
@@ -381,3 +393,101 @@ benchmark:
         #   args:
         #     hadamard_items_per_thread: [1, 5, 10]
         #     hadamard_threads_per_block: [128, 256, 512]
+
+    - name: one_to_one_advanced
+      config:
+        sizes:
+          - "16x10x1x1"
+          - "10x16x1x1"
+          - "313x125x1x1"
+          - "125x313x1x1"
+        data_type: single
+        benchmark_type: None
+        outer_iterations: 1
+        inner_iterations: 2
+        validate: true
+        keep_output: false
+      runs:
+        - name: nai_orig
+          algorithm: nai_orig_one_to_one
+
+        - name: nai_shuffle
+          algorithm: nai_shuffle_one_to_one
+          args:
+            warps_per_thread_block: [8, 9, 16, 32]
+
+        - name: nai_shuffle_work_distribution
+          algorithm: nai_shuffle_work_distribution_one_to_one
+          args:
+            warps_per_thread_block: [8, 9, 16, 32]
+            rows_per_thread: [1, 3, 5, 10, 20, 32, 64]
+            distribution_type: ["none", "rectangle", "triangle"]
+
+
+        - name: nai_shuffle_multimat_right
+          algorithm: nai_shuffle_multimat_right_one_to_one
+          args:
+            warps_per_thread_block: 16
+
+        - name: nai_shuffle_multimat_right_work_distribution
+          algorithm: nai_shuffle_multimat_right_work_distribution_one_to_one
+          args:
+            warps_per_thread_block: 8
+            rows_per_thread: [1, 5, 32]
+            distribution_type: ["none", "rectangle", "triangle"]
+
+        - name: nai_shuffle_multirow_right
+          algorithm: nai_shuffle_multirow_right_one_to_one
+          args:
+            warps_per_thread_block: 8
+            right_rows_per_thread: [3, 4]
+
+        - name: nai_shuffle_multirow_both
+          algorithm: nai_shuffle_multirow_both_one_to_one
+          args:
+            warps_per_thread_block: 8
+            shifts_per_thread: [3, 4]
+            left_rows_per_iteration: [3, 4]
+
+        - name: nai_shuffle_multirow_both_local_mem
+          algorithm: nai_shuffle_multirow_both_local_mem_one_to_one
+          args:
+            warps_per_thread_block: 8
+            shifts_per_thread: [3, 4]
+            left_rows_per_iteration: [3, 4]
+
+        - name: nai_shuffle_multirow_right_multimat_right
+          algorithm: nai_shuffle_multirow_right_multimat_right_one_to_one
+          args:
+            warps_per_thread_block: 8
+            right_rows_per_thread: [3, 4]
+
+        - name: nai_warp_per_shift
+          algorithm: nai_warp_per_shift_one_to_one
+          args:
+            shifts_per_thread_block: 8
+
+        - name: nai_warp_per_shift_simple_indexing
+          algorithm: nai_warp_per_shift_simple_indexing_one_to_one
+          args:
+            shifts_per_thread_block: 8
+
+        - name: nai_warp_per_shift_work_distribution
+          algorithm: nai_warp_per_shift_work_distribution_one_to_one
+          args:
+            shifts_per_thread_block: 8
+            rows_per_warp: [1,  5, 32]
+            distribution_type: ["none", "rectangle", "triangle"]
+
+        - name: nai_warp_per_shift_shared_mem
+          algorithm: nai_warp_per_shift_shared_mem_one_to_one
+          args:
+            shifts_per_thread_block: 8
+            shared_mem_row_size: [32, 128]
+            strided_load: [true, false]
+            column_group_per_block: [true, false]
+
+        - name: nai_block_per_shift
+          algorithm: nai_block_per_shift_one_to_one
+          args:
+            block_size: [128, 512]

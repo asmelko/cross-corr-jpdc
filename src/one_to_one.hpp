@@ -177,6 +177,119 @@ private:
 };
 
 template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
+class naive_shuffle_one_to_one: public naive_gpu_one_to_one<T, BENCH_TYPE, ALLOC> {
+public:
+    explicit naive_shuffle_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
+        :naive_gpu_one_to_one<T, BENCH_TYPE, ALLOC>(std::size(labels), min_measured_time)
+    {
+        warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
+    }
+
+
+    [[nodiscard]] std::vector<std::pair<std::string, std::string>> additional_properties() const override {
+        return std::vector<std::pair<std::string, std::string>>{
+                std::make_pair("warps_per_thread_block", std::to_string(warps_per_thread_block_))
+        };
+    }
+
+protected:
+    void run_impl() override {
+        CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
+                     run_ccn_shuffle(
+                         this->d_ref_,
+                         this->d_target_,
+                         this->d_result_,
+                         this->target_.matrix_size(),
+                         this->result_.matrix_size(),
+                         warps_per_thread_block_
+                     )
+        );
+    }
+
+    [[nodiscard]] std::vector<const char*> measurement_labels_impl() const override {
+        return this->measure_alg() ?
+               std::vector<const char*>(std::begin(labels), std::end(labels)) :
+               std::vector<const char*>{};
+    }
+
+private:
+    inline static const char* labels[] = {
+        "Kernel"
+    };
+
+    dsize_t warps_per_thread_block_;
+};
+
+template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
+class naive_shuffle_work_distribution_one_to_one: public naive_gpu_one_to_one<T, BENCH_TYPE, ALLOC> {
+public:
+    explicit naive_shuffle_work_distribution_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)
+        :naive_gpu_one_to_one<T, BENCH_TYPE, ALLOC>(std::size(labels), min_measured_time)
+    {
+        warps_per_thread_block_ = args.value("warps_per_thread_block", 8);
+        rows_per_thread_ = args.value("rows_per_thread", 10);
+        distribution_type_ = from_string(args.value("distribution_type", "rectangle"));
+    }
+
+    [[nodiscard]] std::vector<std::pair<std::string, std::string>> additional_properties() const override {
+        return std::vector<std::pair<std::string, std::string>>{
+            std::make_pair("warps_per_thread_block", std::to_string(warps_per_thread_block_)),
+            std::make_pair("rows_per_thread", std::to_string(rows_per_thread_)),
+            std::make_pair("distribution_type", to_string(distribution_type_))
+        };
+    }
+
+protected:
+    void run_impl() override {
+        switch (distribution_type_) {
+            case distribution::none:
+                run_kernel<no_distribution>();
+                break;
+            case distribution::rectangle:
+                run_kernel<rectangle_distribution>();
+                break;
+            case distribution::triangle:
+                run_kernel<triangle_distribution>();
+                break;
+        }
+    }
+
+    [[nodiscard]] std::vector<const char*> measurement_labels_impl() const override {
+        return this->measure_alg() ?
+               std::vector<const char*>(std::begin(labels), std::end(labels)) :
+               std::vector<const char*>{};
+    }
+
+private:
+
+    inline static const char* labels[] = {
+        "Kernel"
+    };
+
+    dsize_t warps_per_thread_block_;
+    dsize_t rows_per_thread_;
+    distribution distribution_type_;
+
+    template<typename DISTRIBUTION>
+    void run_kernel() {
+        CUDA_ADAPTIVE_MEASURE(0, this->measure_alg(), this->sw_,
+            // Need to zero out as work distribution uses atomicAdd on the results matrix
+            cuda_memset(this->d_result_, 0, this->result_.size());
+
+            run_ccn_shuffle_work_distribution<DISTRIBUTION>(
+                this->d_ref_,
+                this->d_target_,
+                this->d_result_,
+                this->target_.matrix_size(),
+                this->result_.matrix_size(),
+                warps_per_thread_block_,
+                rows_per_thread_
+            )
+        );
+    }
+};
+
+template<typename T, BenchmarkType BENCH_TYPE, typename ALLOC = std::allocator<T>>
 class naive_shuffle_multimat_right_one_to_one: public naive_gpu_one_to_one<T, BENCH_TYPE, ALLOC> {
 public:
     explicit naive_shuffle_multimat_right_one_to_one(const json& args, std::chrono::nanoseconds min_measured_time)

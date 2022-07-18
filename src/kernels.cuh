@@ -63,6 +63,28 @@ void run_scatter(
 );
 
 template<typename T, typename RES>
+void run_ccn_shuffle(
+    const T* __restrict__ left,
+    const T* __restrict__ right,
+    RES* __restrict__ out,
+    dsize2_t matrix_size,
+    dsize2_t search_size,
+    dsize_t warps_per_thread_block
+);
+
+template<typename DIST, typename T, typename RES>
+void run_ccn_shuffle_work_distribution(
+    const T* __restrict__ left,
+    const T* __restrict__ right,
+    RES* __restrict__ out,
+    dsize2_t matrix_size,
+    dsize2_t search_size,
+    dsize_t warps_per_thread_block,
+    dsize_t max_rows_per_thread,
+    cudaStream_t cuda_stream = nullptr
+);
+
+template<typename T, typename RES>
 void run_ccn_shuffle_multimat_right(
     const T* __restrict__ left,
     const T* __restrict__ right,

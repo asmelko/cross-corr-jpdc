@@ -373,6 +373,8 @@ std::unordered_map<std::string, std::function<int(
         {"nai_orig_one_to_many", run_measurement<naive_original_alg_one_to_many<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
         {"nai_orig_n_to_mn", run_measurement<naive_original_alg_n_to_mn<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
         {"nai_orig_n_to_m", run_measurement<naive_original_alg_n_to_m<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
+        {"nai_shuffle_one_to_one", run_measurement<naive_shuffle_one_to_one<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
+        {"nai_shuffle_work_distribution_one_to_one", run_measurement<naive_shuffle_work_distribution_one_to_one<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
         {"nai_shuffle_multimat_right_one_to_one", run_measurement<naive_shuffle_multimat_right_one_to_one<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
         {"nai_shuffle_multimat_right_one_to_many", run_measurement<naive_shuffle_multimat_right_one_to_many<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},
         {"nai_shuffle_multimat_right_work_distribution_one_to_one", run_measurement<naive_shuffle_multimat_right_work_distribution_one_to_one<DATA_TYPE, BENCH_TYPE, pinned_allocator<DATA_TYPE>>>},

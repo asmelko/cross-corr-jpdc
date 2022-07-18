@@ -136,6 +136,7 @@ set_source_files_properties(${CPP_SOURCES} PROPERTIES LANGUAGE CUDA)
 set(CUDA_SOURCES
         ${CMAKE_SOURCE_DIR}/src/hadamard.cu
         ${CMAKE_SOURCE_DIR}/src/naive_original.cu
+        ${CMAKE_SOURCE_DIR}/src/naive_shuffle.cu
         ${CMAKE_SOURCE_DIR}/src/naive_shuffle_multimat_right.cu
         ${CMAKE_SOURCE_DIR}/src/naive_shuffle_n_to_m_multimat_both.cu
         ${CMAKE_SOURCE_DIR}/src/naive_shuffle_n_to_m_multirow_both_multimat_both.cu
