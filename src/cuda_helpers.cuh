@@ -41,6 +41,11 @@ void cuda_malloc(T** p, dsize_t num) {
 }
 
 template<typename T>
+void cuda_free(T* p) {
+    CUCH(cudaFree(p));
+}
+
+template<typename T>
 void cuda_memcpy_to_device(T* dst, T* src, dsize_t num) {
     CUCH(cudaMemcpy(dst, src, num * sizeof(T), cudaMemcpyHostToDevice));
 }

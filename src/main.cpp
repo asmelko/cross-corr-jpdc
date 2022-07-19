@@ -518,7 +518,7 @@ int main(int argc, char **argv) {
             ("normalize,n", po::bool_switch()->default_value(false), "If algorithm is fft, normalize the results")
             ("append,a", po::bool_switch()->default_value(false), "Append time measurements without the header if the times file already exists instead of overwriting it")
             ("no_progress,p", po::bool_switch()->default_value(false), "Do not print human readable progress, instead any messages to stdout will be formated for machine processing")
-            ("benchmark_type,b", po::value<BenchmarkType>()->default_value(BenchmarkType::Compute), "Which part should be measured, available parts are Compute, CommonSteps, Algorithm")
+            ("benchmark_type,b", po::value<BenchmarkType>()->default_value(BenchmarkType::None), "Which part should be measured, available parts are Compute, CommonSteps, Algorithm")
             ("outer_loops,l", po::value<std::size_t>()->default_value(1), "How many measurements of the computation loop should be done with the loaded data")
             ("min_time,m", po::value<double>()->default_value(1), "The minimum time to consider measurement statistically relevant, in seconds")
             ("args_path", po::value<std::filesystem::path>(), "Path to the JSON file containing arguments for the algorithm")

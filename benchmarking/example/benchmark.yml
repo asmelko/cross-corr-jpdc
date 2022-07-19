@@ -1,0 +1,59 @@
+benchmark:
+  name: example
+  groups:
+    - name: one_to_one
+      config:
+        # All input sizes to measure with
+        # Format is matrix_rows, matrix_cols, number of left matrices, number of right matrices
+        sizes:
+          - "16x16x1x1"
+          - "32x32x1x1"
+          - "48x48x1x1"
+          - "64x64x1x1"
+          - "80x80x1x1"
+          - "96x96x1x1"
+          - "112x112x1x1"
+          - "128x128x1x1"
+          - "144x144x1x1"
+          - "160x160x1x1"
+          - "176x176x1x1"
+          - "192x192x1x1"
+          - "208x208x1x1"
+          - "224x224x1x1"
+          - "240x240x1x1"
+          - "256x256x1x1"
+        # Use float type, not double
+        data_type: single
+        # Measure the whole Computation, but without data loading from disk
+        benchmark_type: Compute
+        # Outer iterations run the cross executable again, clearing caches and loading data
+        outer_iterations: 2
+        # Inner iterations run just the comutation steps with data already loaded in host memory
+        inner_iterations: 10
+        # Minimum time measured by adaptive iteration count is 1 second
+        min_measure_seconds: 1
+        # If validation data should be generated and the results compared with it. Here we are only interested in execution times.
+        validate: false
+        # If result of the computation should be kept. Here we are only interested in the execution times.
+        keep: false
+      runs:
+        - name: basic
+          # Name of the algorithm, listed by ./cross list
+          algorithm: nai_orig_one_to_one
+
+        - name: fft_orig
+          algorithm: fft_orig_one_to_one
+
+        - name: nai_shuffle_multirow_both
+          algorithm: nai_shuffle_multirow_both_one_to_one
+          args:
+            warps_per_thread_block: 4
+            # This algorithm will be run with all 4 combinations of these two arguments
+            shifts_per_thread: [1, 2]
+            left_rows_per_iteration: [1, 2]
+
+        - name: nai_warp_per_shift
+          algorithm: nai_warp_per_shift_one_to_one
+          args:
+            shifts_per_thread_block: 16
+
