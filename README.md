@@ -11,7 +11,7 @@ The top level directories:
 - existing -  Cross-correlation implementations used in the real-world. This repository utilizes them for result validation and comparison against our CUDA C++ implementations.
 - [visualization](./visualization/) - Jupyter notebooks providing visualization of the results measured by the benchmarking tool. Includes all diagrams used in the text of the thesis and much more.
 - gpulab - Scripts for building, measuring and validating the CUDA C++ program on KSI Cluster gpulab. Also usable locally. Must be executed with the gpulab directory as working directory.
-- profiling - Results of profiling the CUDA C++ implementation using Nsight Compute profiler.
+- profiling - Results of profiling the CUDA C++ implementation using Nsight Compute profiler. They are too large to fit the git repository, see the thesis attachments.
 - [sample_app](./sample_app/) - Sample application utilizing one of the cross-correlation implementations provided by this thesis.
 
 ## Building the C++ CUDA implementations
