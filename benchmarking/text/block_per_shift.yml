@@ -1,0 +1,91 @@
+benchmark:
+  groups:
+    - name: one_to_one
+      config:
+        sizes:
+          - "16x16x1x1"
+          - "20x20x1x1"
+          - "24x24x1x1"
+          - "28x28x1x1"
+          - "32x32x1x1"
+          - "36x36x1x1"
+          - "40x40x1x1"
+          - "44x44x1x1"
+          - "48x48x1x1"
+          - "52x52x1x1"
+          - "56x56x1x1"
+          - "60x60x1x1"
+          - "64x64x1x1"
+        data_type: single
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep_output: false
+      runs:
+        - name: orig
+          algorithm: nai_orig_one_to_one
+        - name: per_block
+          algorithm: nai_shift_per_block_one_to_one
+          args:
+            block_size: [128,256,512,1024]
+        - name: per_warp_orig
+          algorithm: nai_shift_per_warp_one_to_one
+          args:
+            shifts_per_block: [8,16,24,32]
+        - name: per_warp_shared_mem
+          algorithm: nai_shift_per_warp_shared_mem_one_to_one
+          args:
+            shifts_per_block: [16, 24, 32]
+            shared_mem_row_size: [64,128,256]
+        - name: per_warp_work_dist
+          algorithm: nai_shift_per_warp_work_distribution_one_to_one
+          args:
+            shifts_per_block: [8,16,24,32]
+            rows_per_warp: [3,10,16,32,64]
+            distribution_type: ["rectangle", "triangle"]
+    - name: one_to_one_algorithm
+      config:
+        sizes:
+          - "16x16x1x1"
+          - "20x20x1x1"
+          - "24x24x1x1"
+          - "28x28x1x1"
+          - "32x32x1x1"
+          - "36x36x1x1"
+          - "40x40x1x1"
+          - "44x44x1x1"
+          - "48x48x1x1"
+          - "52x52x1x1"
+          - "56x56x1x1"
+          - "60x60x1x1"
+          - "64x64x1x1"
+        data_type: single
+        benchmark_type: Algorithm
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep_output: false
+      runs:
+        - name: orig
+          algorithm: nai_orig_one_to_one
+        - name: per_block
+          algorithm: nai_shift_per_block_one_to_one
+          args:
+            block_size: [128,256,512,1024]
+        - name: per_warp_orig
+          algorithm: nai_shift_per_warp_one_to_one
+          args:
+            shifts_per_block: [8,16,24,32]
+        - name: per_warp_shared_mem
+          algorithm: nai_shift_per_warp_shared_mem_rows_one_to_one
+          args:
+            shifts_per_block: [16, 24, 32]
+            shared_mem_row_size: [64,128,256]
+        - name: per_warp_work_dist
+          algorithm: nai_shift_per_warp_work_distribution_one_to_one
+          args:
+            shifts_per_block: [8,16,24,32]
+            rows_per_warp: [3,10,16,32,64]
+            distribution_type: ["rectangle", "triangle"]

@@ -1,0 +1,224 @@
+benchmark:
+  name: args_test3
+  groups:
+    - name: one_to_one
+      config:
+        sizes:
+          - "32x32x1x1"
+          - "64x64x1x1"
+          - "128x128x1x1"
+          - "256x256x1x1"
+          - "512x512x1x1"
+          - "1024x1024x1x1"
+          - "2048x2048x1x1"
+        data_type: single
+        benchmark_type: Algorithm
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep_output: false
+      runs:
+        - name: nai_warp_per_shift_shared_mem
+          algorithm: nai_warp_per_shift_shared_mem_one_to_one
+          args:
+            shifts_per_thread_block: [16, 24]
+            shared_mem_row_size: [160, 192, 256]
+            strided_load: true
+            column_group_per_block: true
+
+    - name: one_to_many
+      config:
+        sizes:
+          - "32x32x1x2"
+          - "64x64x1x2"
+          - "128x128x1x2"
+          - "256x256x1x2"
+          - "512x512x1x2"
+          - "32x32x1x4"
+          - "64x64x1x4"
+          - "128x128x1x4"
+          - "256x256x1x4"
+          - "512x512x1x4"
+          - "32x32x1x8"
+          - "64x64x1x8"
+          - "128x128x1x8"
+          - "256x256x1x8"
+          - "512x512x1x8"
+          - "32x32x1x16"
+          - "64x64x1x16"
+          - "128x128x1x16"
+          - "256x256x1x16"
+          - "512x512x1x16"
+          - "32x32x1x1024"
+          - "64x64x1x1024"
+          - "128x128x1x1024"
+          - "256x256x1x1024"
+          - "512x512x1x1024"
+        data_type: single
+        benchmark_type: Algorithm
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep_output: false
+      runs:
+        - name: nai_shuffle_multimat_right
+          algorithm: nai_shuffle_multimat_right_one_to_many
+          args:
+            warps_per_thread_block: [2, 4]
+            right_matrices_per_thread: [2, 4, 8]
+
+        - name: nai_shuffle_multirow_both_multimat_right
+          algorithm: nai_shuffle_multirow_both_multimat_right_one_to_many
+          args:
+            warps_per_thread_block: [2, 4]
+            shifts_per_thread_right_matrix: 4
+            right_matrices_per_thread: 4
+            left_rows_per_iteration: 4
+
+        # - name: fft_orig
+        #   algorithm: fft_orig_one_to_many
+        #   args:
+        #     hadamard_threads_per_block: [256, 512]
+
+        # - name: fft_reduced_transfer
+        #   algorithm: fft_reduced_transfer_one_to_many
+        #   args:
+        #     scatter_threads_per_block: [256, 512]
+        #     scatter_items_per_thread: [1, 10]
+        #     hadamard_threads_per_block: [256, 512]
+
+    - name: n_to_mn
+      config:
+        sizes:
+          - "32x32x2x4"
+          - "64x64x2x4"
+          - "128x128x2x4"
+          - "256x256x2x4"
+          - "512x512x2x4"
+          - "32x32x2x8"
+          - "64x64x2x8"
+          - "128x128x2x8"
+          - "256x256x2x8"
+          - "512x512x2x8"
+          - "32x32x4x8"
+          - "64x64x4x8"
+          - "128x128x4x8"
+          - "256x256x4x8"
+          - "512x512x4x8"
+          - "32x32x4x16"
+          - "64x64x4x16"
+          - "128x128x4x16"
+          - "256x256x4x16"
+          - "512x512x4x16"
+          - "32x32x100x1000"
+          - "64x64x100x1000"
+          - "128x128x100x1000"
+          - "256x256x100x1000"
+          - "512x512x100x1000"
+        data_type: single
+        benchmark_type: Algorithm
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep_output: false
+      runs:
+        - name: nai_shuffle_multirow_right_multimat_right
+          algorithm: nai_shuffle_multirow_right_multimat_right_n_to_mn
+          args:
+            warps_per_thread_block: [2, 4]
+            right_rows_per_thread: 2
+            right_matrices_per_thread: 4
+            num_cuda_streams: 16
+
+        - name: nai_shuffle_multirow_both_multimat_right
+          algorithm: nai_shuffle_multirow_both_multimat_right_n_to_mn
+          args:
+            warps_per_thread_block: [2, 4]
+            shifts_per_thread_right_matrix: 4
+            right_matrices_per_thread: 4
+            left_rows_per_iteration: 4
+            num_cuda_streams: 16
+
+        # - name: fft_orig
+        #   algorithm: fft_orig_n_to_mn
+        #   args:
+        #     hadamard_threads_per_block: [256, 512]
+
+        # - name: fft_reduced_transfer
+        #   algorithm: fft_reduced_transfer_n_to_mn
+        #   args:
+        #     scatter_threads_per_block: [256, 512]
+        #     scatter_items_per_thread: [1, 10]
+        #     hadamard_threads_per_block: [256, 512]
+
+    - name: n_to_m
+      config:
+        sizes:
+          - "32x32x2x2"
+          - "64x64x2x2"
+          - "128x128x2x2"
+          - "256x256x2x2"
+          - "512x512x2x2"
+          - "32x32x2x4"
+          - "64x64x2x4"
+          - "128x128x2x4"
+          - "256x256x2x4"
+          - "512x512x2x4"
+          - "32x32x4x2"
+          - "64x64x4x2"
+          - "128x128x4x2"
+          - "256x256x4x2"
+          - "512x512x4x2"
+          - "32x32x4x16"
+          - "64x64x4x16"
+          - "128x128x4x16"
+          - "256x256x4x16"
+          - "512x512x4x16"
+          - "32x32x50x50"
+          - "64x64x50x50"
+          - "128x128x50x50"
+          - "256x256x50x50"
+          - "512x512x50x50"
+        data_type: single
+        benchmark_type: Algorithm
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep_output: false
+      runs:
+        - name: nai_shuffle_multimat_right_work_distribution
+          algorithm: nai_shuffle_multimat_right_work_distribution_n_to_m
+          args:
+            warps_per_thread_block: [2, 4]
+            right_matrices_per_thread: 8
+            rows_per_thread: 1
+            distribution_type: ["triangle", "none"]
+            num_cuda_streams: 8
+
+        - name: nai_shuffle_multimat_both_work_distribution
+          algorithm: nai_shuffle_multimat_both_work_distribution_n_to_m
+          args:
+            warps_per_thread_block: [2, 4]
+            left_matrices_per_thread: 4
+            right_matrices_per_thread: 4
+            rows_per_thread: 1
+            distribution_type: ["triangle", "none"]
+
+        - name: nai_shuffle_multirow_both_multimat_both
+          algorithm: nai_shuffle_multirow_both_multimat_both_n_to_m
+          args:
+            warps_per_thread_block: 4
+            shifts_per_thread_right_matrix: [2, 4]
+            left_matrices_per_thread: [2, 4]
+            right_matrices_per_thread: [2, 4]
+            left_rows_per_iteration: 4
+
+        # - name: fft_better
+        #   algorithm: fft_better_n_to_m
+        #   args:
+        #     hadamard_items_per_thread: [1, 10]
+        #     hadamard_threads_per_block: [256, 512]

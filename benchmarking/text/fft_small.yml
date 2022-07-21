@@ -1,0 +1,240 @@
+benchmark:
+  name: fft
+  groups:
+    - name: single_one_to_one_steps
+      config:
+        sizes:
+          - "16x16x1x1"
+          - "20x20x1x1"
+          - "24x24x1x1"
+          - "28x28x1x1"
+          - "32x32x1x1"
+          - "36x36x1x1"
+          - "40x40x1x1"
+          - "44x44x1x1"
+          - "48x48x1x1"
+          - "52x52x1x1"
+          - "56x56x1x1"
+          - "60x60x1x1"
+          - "64x64x1x1"
+          - "68x68x1x1"
+          - "72x72x1x1"
+          - "76x76x1x1"
+          - "80x80x1x1"
+          - "84x84x1x1"
+          - "88x88x1x1"
+          - "92x92x1x1"
+          - "96x96x1x1"
+          - "100x100x1x1"
+          - "104x104x1x1"
+          - "108x108x1x1"
+          - "116x116x1x1"
+          - "120x120x1x1"
+          - "124x124x1x1"
+          - "128x128x1x1"
+        data_type: single
+        benchmark_type: CommonSteps
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep: false
+      runs:
+        - name: fft_orig
+          algorithm: fft_orig_one_to_one
+
+    - name: single_one_to_one_computate
+      config:
+        sizes:
+          - "16x16x1x1"
+          - "20x20x1x1"
+          - "24x24x1x1"
+          - "28x28x1x1"
+          - "32x32x1x1"
+          - "36x36x1x1"
+          - "40x40x1x1"
+          - "44x44x1x1"
+          - "48x48x1x1"
+          - "52x52x1x1"
+          - "56x56x1x1"
+          - "60x60x1x1"
+          - "64x64x1x1"
+          - "68x68x1x1"
+          - "72x72x1x1"
+          - "76x76x1x1"
+          - "80x80x1x1"
+          - "84x84x1x1"
+          - "88x88x1x1"
+          - "92x92x1x1"
+          - "96x96x1x1"
+          - "100x100x1x1"
+          - "104x104x1x1"
+          - "108x108x1x1"
+          - "116x116x1x1"
+          - "120x120x1x1"
+          - "124x124x1x1"
+          - "128x128x1x1"
+        data_type: single
+        benchmark_type: Compute
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep: false
+      runs:
+        - name: fft_orig
+          algorithm: fft_orig_one_to_one
+
+    - name: double_one_to_one_steps
+      config:
+        sizes:
+          - "16x16x1x1"
+          - "20x20x1x1"
+          - "24x24x1x1"
+          - "28x28x1x1"
+          - "32x32x1x1"
+          - "36x36x1x1"
+          - "40x40x1x1"
+          - "44x44x1x1"
+          - "48x48x1x1"
+          - "52x52x1x1"
+          - "56x56x1x1"
+          - "60x60x1x1"
+          - "64x64x1x1"
+          - "68x68x1x1"
+          - "72x72x1x1"
+          - "76x76x1x1"
+          - "80x80x1x1"
+          - "84x84x1x1"
+          - "88x88x1x1"
+          - "92x92x1x1"
+          - "96x96x1x1"
+          - "100x100x1x1"
+          - "104x104x1x1"
+          - "108x108x1x1"
+          - "116x116x1x1"
+          - "120x120x1x1"
+          - "124x124x1x1"
+          - "128x128x1x1"
+        data_type: double
+        benchmark_type: CommonSteps
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep: false
+      runs:
+        - name: fft_orig
+          algorithm: fft_orig_one_to_one
+
+    - name: double_one_to_one_compute
+      config:
+        sizes:
+          - "16x16x1x1"
+          - "20x20x1x1"
+          - "24x24x1x1"
+          - "28x28x1x1"
+          - "32x32x1x1"
+          - "36x36x1x1"
+          - "40x40x1x1"
+          - "44x44x1x1"
+          - "48x48x1x1"
+          - "52x52x1x1"
+          - "56x56x1x1"
+          - "60x60x1x1"
+          - "64x64x1x1"
+          - "68x68x1x1"
+          - "72x72x1x1"
+          - "76x76x1x1"
+          - "80x80x1x1"
+          - "84x84x1x1"
+          - "88x88x1x1"
+          - "92x92x1x1"
+          - "96x96x1x1"
+          - "100x100x1x1"
+          - "104x104x1x1"
+          - "108x108x1x1"
+          - "116x116x1x1"
+          - "120x120x1x1"
+          - "124x124x1x1"
+          - "128x128x1x1"
+        data_type: double
+        benchmark_type: Compute
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep: false
+      runs:
+        - name: fft_orig
+          algorithm: fft_orig_one_to_one
+
+    # - name: single_n_to_m
+    #   config:
+    #     sizes:
+    #       - "16x16x2x4"
+    #       - "32x32x2x4"
+    #       - "64x64x2x4"
+    #       - "128x128x2x4"
+    #       - "256x256x2x4"
+    #       - "512x512x2x4"
+    #       - "16x16x2x8"
+    #       - "32x32x2x8"
+    #       - "64x64x2x8"
+    #       - "128x128x2x8"
+    #       - "256x256x2x8"
+    #       - "512x512x2x8"
+    #       - "16x16x4x4"
+    #       - "32x32x4x4"
+    #       - "64x64x4x4"
+    #       - "128x128x4x4"
+    #       - "256x256x4x4"
+    #       - "512x512x4x4"
+    #       - "16x16x4x8"
+    #       - "32x32x4x8"
+    #       - "64x64x4x8"
+    #       - "128x128x4x8"
+    #       - "256x256x4x8"
+    #       - "512x512x4x8"
+    #     data_type: single
+    #     iterations: 50
+    #     validate: false
+    #     keep: false
+    #   runs:
+    #     - name: fft_better
+    #       algorithm: fft_better_n_to_m
+
+    # - name: double_n_to_m
+    #   config:
+    #     sizes:
+    #       - "16x16x2x4"
+    #       - "32x32x2x4"
+    #       - "64x64x2x4"
+    #       - "128x128x2x4"
+    #       - "256x256x2x4"
+    #       - "512x512x2x4"
+    #       - "16x16x2x8"
+    #       - "32x32x2x8"
+    #       - "64x64x2x8"
+    #       - "128x128x2x8"
+    #       - "256x256x2x8"
+    #       - "512x512x2x8"
+    #       - "16x16x4x4"
+    #       - "32x32x4x4"
+    #       - "64x64x4x4"
+    #       - "128x128x4x4"
+    #       - "256x256x4x4"
+    #       - "512x512x4x4"
+    #       - "16x16x4x8"
+    #       - "32x32x4x8"
+    #       - "64x64x4x8"
+    #       - "128x128x4x8"
+    #       - "256x256x4x8"
+    #       - "512x512x4x8"
+    #     data_type: double
+    #     iterations: 50
+    #     validate: false
+    #     keep: false
+    #   runs:
+    #     - name: fft_better
+    #       algorithm: fft_better_n_to_m

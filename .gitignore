@@ -1,4 +1,6 @@
-data
+# Commit some of the data
+#data/*
+!data/README.md
 build
 cmake-build-debug
 .idea

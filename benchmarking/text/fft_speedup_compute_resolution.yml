@@ -1,0 +1,759 @@
+benchmark:
+  groups:
+    - name: one_to_one
+      config:
+        sizes:
+          - "16x16x1x1"
+          - "32x32x1x1"
+          - "48x48x1x1"
+          - "64x64x1x1"
+          - "80x80x1x1"
+          - "96x96x1x1"
+          - "112x112x1x1"
+          - "128x128x1x1"
+          - "144x144x1x1"
+          - "160x160x1x1"
+          - "192x192x1x1"
+          - "224x224x1x1"
+          - "256x256x1x1"
+        data_type: single
+        benchmark_type: Compute
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep: false
+      runs:
+        - name: basic
+          algorithm: nai_orig_one_to_one
+
+        - name: fft_orig
+          algorithm: fft_orig_one_to_one
+
+        - name: nai_shuffle_multimat_right_work_distribution
+          algorithm: nai_shuffle_multimat_right_work_distribution_one_to_one
+          args:
+            warps_per_thread_block: 8
+            rows_per_thread: 1
+            distribution_type: "triangle"
+
+        - name: nai_shuffle_multirow_both
+          algorithm: nai_shuffle_multirow_both_one_to_one
+          args:
+            warps_per_thread_block: 8
+            shifts_per_thread: [4, 8]
+            left_rows_per_iteration: 4
+
+        - name: nai_warp_per_shift
+          algorithm: nai_warp_per_shift_one_to_one
+          args:
+            shifts_per_thread_block: 16
+
+        - name: nai_warp_per_shift_shared_mem
+          algorithm: nai_warp_per_shift_shared_mem_one_to_one
+          args:
+            shifts_per_thread_block: 16
+            shared_mem_row_size: 128
+            strided_load: true
+            column_group_per_block: true
+
+
+    - name: one_to_many
+      config:
+        sizes:
+          - "16x16x1x2"
+          - "32x32x1x2"
+          - "48x48x1x2"
+          - "64x64x1x2"
+          - "80x80x1x2"
+          - "96x96x1x2"
+          - "112x112x1x2"
+          - "128x128x1x2"
+          - "144x144x1x2"
+          - "160x160x1x2"
+          - "192x192x1x2"
+          - "224x224x1x2"
+          - "256x256x1x2"
+          - "16x16x1x4"
+          - "32x32x1x4"
+          - "48x48x1x4"
+          - "64x64x1x4"
+          - "80x80x1x4"
+          - "96x96x1x4"
+          - "112x112x1x4"
+          - "128x128x1x4"
+          - "144x144x1x4"
+          - "160x160x1x4"
+          - "192x192x1x4"
+          - "224x224x1x4"
+          - "256x256x1x4"
+          - "16x16x1x8"
+          - "32x32x1x8"
+          - "48x48x1x8"
+          - "64x64x1x8"
+          - "80x80x1x8"
+          - "96x96x1x8"
+          - "112x112x1x8"
+          - "128x128x1x8"
+          - "144x144x1x8"
+          - "160x160x1x8"
+          - "192x192x1x8"
+          - "224x224x1x8"
+          - "256x256x1x8"
+          - "16x16x1x16"
+          - "32x32x1x16"
+          - "48x48x1x16"
+          - "64x64x1x16"
+          - "80x80x1x16"
+          - "96x96x1x16"
+          - "112x112x1x16"
+          - "128x128x1x16"
+          - "144x144x1x16"
+          - "160x160x1x16"
+          - "192x192x1x16"
+          - "224x224x1x16"
+          - "256x256x1x16"
+          - "16x16x1x1024"
+          - "32x32x1x1024"
+          - "48x48x1x1024"
+          - "64x64x1x1024"
+          - "80x80x1x1024"
+          - "96x96x1x1024"
+          - "112x112x1x1024"
+          - "128x128x1x1024"
+          - "144x144x1x1024"
+          - "160x160x1x1024"
+          - "192x192x1x1024"
+          - "224x224x1x1024"
+          - "256x256x1x1024"
+        data_type: single
+        benchmark_type: Compute
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep_output: false
+      runs:
+        - name: basic
+          algorithm: nai_orig_one_to_many
+
+        - name: fft_orig
+          algorithm: fft_orig_one_to_many
+
+        - name: nai_shuffle_multimat_right_work_distribution
+          algorithm: nai_shuffle_multimat_right_work_distribution_one_to_many
+          args:
+            warps_per_thread_block: 8
+            right_matrices_per_thread: 8
+            rows_per_thread: 1
+            distribution_type: "triangle"
+
+        - name: nai_shuffle_multirow_both_multimat_right
+          algorithm: nai_shuffle_multirow_both_multimat_right_one_to_many
+          args:
+            warps_per_thread_block: 4
+            shifts_per_thread_right_matrix: 4
+            right_matrices_per_thread: 4
+            left_rows_per_iteration: 4
+
+    - name: n_to_mn
+      config:
+        sizes:
+          - "16x16x2x4"
+          - "32x32x2x4"
+          - "48x48x2x4"
+          - "64x64x2x4"
+          - "80x80x2x4"
+          - "96x96x2x4"
+          - "112x112x2x4"
+          - "128x128x2x4"
+          - "144x144x2x4"
+          - "160x160x2x4"
+          - "192x192x2x4"
+          - "224x224x2x4"
+          - "256x256x2x4"
+          - "16x16x2x8"
+          - "32x32x2x8"
+          - "48x48x2x8"
+          - "64x64x2x8"
+          - "80x80x2x8"
+          - "96x96x2x8"
+          - "112x112x2x8"
+          - "128x128x2x8"
+          - "144x144x2x8"
+          - "160x160x2x8"
+          - "192x192x2x8"
+          - "224x224x2x8"
+          - "256x256x2x8"
+          - "16x16x4x8"
+          - "32x32x4x8"
+          - "48x48x4x8"
+          - "64x64x4x8"
+          - "80x80x4x8"
+          - "96x96x4x8"
+          - "112x112x4x8"
+          - "128x128x4x8"
+          - "144x144x4x8"
+          - "160x160x4x8"
+          - "192x192x4x8"
+          - "224x224x4x8"
+          - "256x256x4x8"
+          - "16x16x4x16"
+          - "32x32x4x16"
+          - "48x48x4x16"
+          - "64x64x4x16"
+          - "80x80x4x16"
+          - "96x96x4x16"
+          - "112x112x4x16"
+          - "128x128x4x16"
+          - "144x144x4x16"
+          - "160x160x4x16"
+          - "192x192x4x16"
+          - "224x224x4x16"
+          - "256x256x4x16"
+          - "16x16x100x1000"
+          - "32x32x100x1000"
+          - "48x48x100x1000"
+          - "64x64x100x1000"
+          - "80x80x100x1000"
+          - "96x96x100x1000"
+          - "112x112x100x1000"
+          - "128x128x100x1000"
+          - "144x144x100x1000"
+          - "160x160x100x1000"
+          - "192x192x100x1000"
+          - "224x224x100x1000"
+          - "256x256x100x1000"
+        data_type: single
+        benchmark_type: Compute
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep_output: false
+      runs:
+        - name: basic
+          algorithm: nai_orig_n_to_mn
+
+        - name: fft_orig
+          algorithm: fft_orig_n_to_mn
+
+        - name: nai_shuffle_multimat_right_work_distribution
+          algorithm: nai_shuffle_multimat_right_work_distribution_n_to_mn
+          args:
+            warps_per_thread_block: 4
+            right_matrices_per_thread: 8
+            rows_per_thread: 1
+            distribution_type: "triangle"
+
+        - name: nai_shuffle_multirow_both_multimat_right
+          algorithm: nai_shuffle_multirow_both_multimat_right_n_to_mn
+          args:
+            warps_per_thread_block: 4
+            shifts_per_thread_right_matrix: 4
+            right_matrices_per_thread: 4
+            left_rows_per_iteration: 4
+            num_cuda_streams: 16
+
+        - name: nai_warp_per_shift_shared_mem
+          algorithm: nai_warp_per_shift_shared_mem_n_to_mn
+          args:
+            shifts_per_thread_block: 16
+            shared_mem_row_size: 128
+            strided_load: true
+            column_group_per_block: false
+            right_matrices_per_block: 2
+            num_cuda_streams: 8
+
+    - name: n_to_m
+      config:
+        sizes:
+          - "16x16x4x4"
+          - "32x32x4x4"
+          - "48x48x4x4"
+          - "64x64x4x4"
+          - "80x80x4x4"
+          - "96x96x4x4"
+          - "112x112x4x4"
+          - "128x128x4x4"
+          - "144x144x4x4"
+          - "160x160x4x4"
+          - "192x192x4x4"
+          - "224x224x4x4"
+          - "256x256x4x4"
+          - "16x16x4x8"
+          - "32x32x4x8"
+          - "48x48x4x8"
+          - "64x64x4x8"
+          - "80x80x4x8"
+          - "96x96x4x8"
+          - "112x112x4x8"
+          - "128x128x4x8"
+          - "144x144x4x8"
+          - "160x160x4x8"
+          - "192x192x4x8"
+          - "224x224x4x8"
+          - "256x256x4x8"
+          - "16x16x8x4"
+          - "32x32x8x4"
+          - "48x48x8x4"
+          - "64x64x8x4"
+          - "80x80x8x4"
+          - "96x96x8x4"
+          - "112x112x8x4"
+          - "128x128x8x4"
+          - "144x144x8x4"
+          - "160x160x8x4"
+          - "192x192x8x4"
+          - "224x224x8x4"
+          - "256x256x8x4"
+          - "16x16x8x8"
+          - "32x32x8x8"
+          - "48x48x8x8"
+          - "64x64x8x8"
+          - "80x80x8x8"
+          - "96x96x8x8"
+          - "112x112x8x8"
+          - "128x128x8x8"
+          - "144x144x8x8"
+          - "160x160x8x8"
+          - "192x192x8x8"
+          - "224x224x8x8"
+          - "256x256x8x8"
+          - "16x16x50x50"
+          - "32x32x50x50"
+          - "48x48x50x50"
+          - "64x64x50x50"
+          - "80x80x50x50"
+          - "96x96x50x50"
+          - "112x112x50x50"
+          - "128x128x50x50"
+          - "144x144x50x50"
+          - "160x160x50x50"
+          - "192x192x50x50"
+          - "224x224x50x50"
+          - "256x256x50x50"
+        data_type: single
+        benchmark_type: Compute
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep_output: false
+      runs:
+        - name: basic
+          algorithm: nai_orig_n_to_m
+
+        - name: fft_orig
+          algorithm: fft_better_n_to_m
+
+        - name: nai_shuffle_multimat_both_work_distribution
+          algorithm: nai_shuffle_multimat_both_work_distribution_n_to_m
+          args:
+            warps_per_thread_block: 4
+            left_matrices_per_thread: 4
+            right_matrices_per_thread: 4
+            rows_per_thread: 1
+            distribution_type: "triangle"
+
+        - name: nai_shuffle_multirow_both_multimat_both
+          algorithm: nai_shuffle_multirow_both_multimat_both_n_to_m
+          args:
+            warps_per_thread_block: 4
+            shifts_per_thread_right_matrix: 4
+            # 4 and 4 matrices is better for larger number of input matrices
+            # at least 128x128
+            left_matrices_per_thread: 2
+            right_matrices_per_thread: 2
+            left_rows_per_iteration: 4
+
+        # Cannot be run on laptop
+        - name: nai_shuffle_multirow_both_multimat_both_large
+          algorithm: nai_shuffle_multirow_both_multimat_both_n_to_m
+          args:
+            warps_per_thread_block: 4
+            shifts_per_thread_right_matrix: 4
+            # 4 and 4 matrices is better for larger number of input matrices
+            # at least 128x128
+            left_matrices_per_thread: 4
+            right_matrices_per_thread: 4
+            left_rows_per_iteration: 4
+
+    - name: one_to_one_anti_fft
+      config:
+        sizes:
+          - "17x17x1x1"
+          - "31x31x1x1"
+          - "47x47x1x1"
+          - "61x61x1x1"
+          - "79x79x1x1"
+          - "97x97x1x1"
+          - "113x113x1x1"
+          - "127x127x1x1"
+          - "139x139x1x1"
+          - "157x157x1x1"
+          - "191x191x1x1"
+          - "223x223x1x1"
+          - "257x257x1x1"
+        data_type: single
+        benchmark_type: Compute
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep: false
+      runs:
+        - name: basic
+          algorithm: nai_orig_one_to_one
+
+        - name: fft_orig
+          algorithm: fft_orig_one_to_one
+
+        - name: nai_shuffle_multimat_right_work_distribution
+          algorithm: nai_shuffle_multimat_right_work_distribution_one_to_one
+          args:
+            warps_per_thread_block: 8
+            rows_per_thread: 1
+            distribution_type: "triangle"
+
+        - name: nai_shuffle_multirow_both
+          algorithm: nai_shuffle_multirow_both_one_to_one
+          args:
+            warps_per_thread_block: 8
+            shifts_per_thread: [4, 8]
+            left_rows_per_iteration: 4
+
+        - name: nai_warp_per_shift
+          algorithm: nai_warp_per_shift_one_to_one
+          args:
+            shifts_per_thread_block: 16
+
+        - name: nai_warp_per_shift_shared_mem
+          algorithm: nai_warp_per_shift_shared_mem_one_to_one
+          args:
+            shifts_per_thread_block: 16
+            shared_mem_row_size: 128
+            strided_load: true
+            column_group_per_block: true
+
+
+    - name: one_to_many_anti_fft
+      config:
+        sizes:
+          - "17x17x1x2"
+          - "31x31x1x2"
+          - "47x47x1x2"
+          - "61x61x1x2"
+          - "79x79x1x2"
+          - "97x97x1x2"
+          - "113x113x1x2"
+          - "127x127x1x2"
+          - "139x139x1x2"
+          - "157x157x1x2"
+          - "191x191x1x2"
+          - "223x223x1x2"
+          - "257x257x1x2"
+          - "17x17x1x4"
+          - "31x31x1x4"
+          - "47x47x1x4"
+          - "61x61x1x4"
+          - "79x79x1x4"
+          - "97x97x1x4"
+          - "113x113x1x4"
+          - "127x127x1x4"
+          - "139x139x1x4"
+          - "157x157x1x4"
+          - "191x191x1x4"
+          - "223x223x1x4"
+          - "257x257x1x4"
+          - "17x17x1x8"
+          - "31x31x1x8"
+          - "47x47x1x8"
+          - "61x61x1x8"
+          - "79x79x1x8"
+          - "97x97x1x8"
+          - "113x113x1x8"
+          - "127x127x1x8"
+          - "139x139x1x8"
+          - "157x157x1x8"
+          - "191x191x1x8"
+          - "223x223x1x8"
+          - "257x257x1x8"
+          - "17x17x1x16"
+          - "31x31x1x16"
+          - "47x47x1x16"
+          - "61x61x1x16"
+          - "79x79x1x16"
+          - "97x97x1x16"
+          - "113x113x1x16"
+          - "127x127x1x16"
+          - "139x139x1x16"
+          - "157x157x1x16"
+          - "191x191x1x16"
+          - "223x223x1x16"
+          - "257x257x1x16"
+          - "17x17x1x1024"
+          - "31x31x1x1024"
+          - "47x47x1x1024"
+          - "61x61x1x1024"
+          - "79x79x1x1024"
+          - "97x97x1x1024"
+          - "113x113x1x1024"
+          - "127x127x1x1024"
+          - "139x139x1x1024"
+          - "157x157x1x1024"
+          - "191x191x1x1024"
+          - "223x223x1x1024"
+          - "257x257x1x1024"
+        data_type: single
+        benchmark_type: Compute
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep_output: false
+      runs:
+        - name: basic
+          algorithm: nai_orig_one_to_many
+
+        - name: fft_orig
+          algorithm: fft_orig_one_to_many
+
+        - name: nai_shuffle_multimat_right_work_distribution
+          algorithm: nai_shuffle_multimat_right_work_distribution_one_to_many
+          args:
+            warps_per_thread_block: 8
+            right_matrices_per_thread: 8
+            rows_per_thread: 1
+            distribution_type: "triangle"
+
+        - name: nai_shuffle_multirow_both_multimat_right
+          algorithm: nai_shuffle_multirow_both_multimat_right_one_to_many
+          args:
+            warps_per_thread_block: 4
+            shifts_per_thread_right_matrix: 4
+            right_matrices_per_thread: 4
+            left_rows_per_iteration: 4
+
+    - name: n_to_mn_anti_fft
+      config:
+        sizes:
+          - "17x17x2x4"
+          - "31x31x2x4"
+          - "47x47x2x4"
+          - "61x61x2x4"
+          - "79x79x2x4"
+          - "97x97x2x4"
+          - "113x113x2x4"
+          - "127x127x2x4"
+          - "139x139x2x4"
+          - "157x157x2x4"
+          - "191x191x2x4"
+          - "223x223x2x4"
+          - "257x257x2x4"
+          - "17x17x2x8"
+          - "31x31x2x8"
+          - "47x47x2x8"
+          - "61x61x2x8"
+          - "79x79x2x8"
+          - "97x97x2x8"
+          - "113x113x2x8"
+          - "127x127x2x8"
+          - "139x139x2x8"
+          - "157x157x2x8"
+          - "191x191x2x8"
+          - "223x223x2x8"
+          - "257x257x2x8"
+          - "17x17x4x8"
+          - "31x31x4x8"
+          - "47x47x4x8"
+          - "61x61x4x8"
+          - "79x79x4x8"
+          - "97x97x4x8"
+          - "113x113x4x8"
+          - "127x127x4x8"
+          - "139x139x4x8"
+          - "157x157x4x8"
+          - "191x191x4x8"
+          - "223x223x4x8"
+          - "257x257x4x8"
+          - "17x17x4x16"
+          - "31x31x4x16"
+          - "47x47x4x16"
+          - "61x61x4x16"
+          - "79x79x4x16"
+          - "97x97x4x16"
+          - "113x113x4x16"
+          - "127x127x4x16"
+          - "139x139x4x16"
+          - "157x157x4x16"
+          - "191x191x4x16"
+          - "223x223x4x16"
+          - "257x257x4x16"
+          - "17x17x100x1000"
+          - "31x31x100x1000"
+          - "47x47x100x1000"
+          - "61x61x100x1000"
+          - "79x79x100x1000"
+          - "97x97x100x1000"
+          - "113x113x100x1000"
+          - "127x127x100x1000"
+          - "139x139x100x1000"
+          - "157x157x100x1000"
+          - "191x191x100x1000"
+          - "223x223x100x1000"
+          - "257x257x100x1000"
+        data_type: single
+        benchmark_type: Compute
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep_output: false
+      runs:
+        - name: basic
+          algorithm: nai_orig_n_to_mn
+
+        - name: fft_orig
+          algorithm: fft_orig_n_to_mn
+
+        - name: nai_shuffle_multimat_right_work_distribution
+          algorithm: nai_shuffle_multimat_right_work_distribution_n_to_mn
+          args:
+            warps_per_thread_block: 4
+            right_matrices_per_thread: 8
+            rows_per_thread: 1
+            distribution_type: "triangle"
+
+        - name: nai_shuffle_multirow_both_multimat_right
+          algorithm: nai_shuffle_multirow_both_multimat_right_n_to_mn
+          args:
+            warps_per_thread_block: 4
+            shifts_per_thread_right_matrix: 4
+            right_matrices_per_thread: 4
+            left_rows_per_iteration: 4
+            num_cuda_streams: 16
+
+        - name: nai_warp_per_shift_shared_mem
+          algorithm: nai_warp_per_shift_shared_mem_n_to_mn
+          args:
+            shifts_per_thread_block: 16
+            shared_mem_row_size: 128
+            strided_load: true
+            column_group_per_block: false
+            right_matrices_per_block: 2
+            num_cuda_streams: 8
+
+    - name: n_to_m_anti_fft
+      config:
+        sizes:
+          - "17x17x4x4"
+          - "31x31x4x4"
+          - "47x47x4x4"
+          - "61x61x4x4"
+          - "79x79x4x4"
+          - "97x97x4x4"
+          - "113x113x4x4"
+          - "127x127x4x4"
+          - "139x139x4x4"
+          - "157x157x4x4"
+          - "191x191x4x4"
+          - "223x223x4x4"
+          - "257x257x4x4"
+          - "17x17x4x8"
+          - "31x31x4x8"
+          - "47x47x4x8"
+          - "61x61x4x8"
+          - "79x79x4x8"
+          - "97x97x4x8"
+          - "113x113x4x8"
+          - "127x127x4x8"
+          - "139x139x4x8"
+          - "157x157x4x8"
+          - "191x191x4x8"
+          - "223x223x4x8"
+          - "257x257x4x8"
+          - "17x17x8x4"
+          - "31x31x8x4"
+          - "47x47x8x4"
+          - "61x61x8x4"
+          - "79x79x8x4"
+          - "97x97x8x4"
+          - "113x113x8x4"
+          - "127x127x8x4"
+          - "139x139x8x4"
+          - "157x157x8x4"
+          - "191x191x8x4"
+          - "223x223x8x4"
+          - "257x257x8x4"
+          - "17x17x8x8"
+          - "31x31x8x8"
+          - "47x47x8x8"
+          - "61x61x8x8"
+          - "79x79x8x8"
+          - "97x97x8x8"
+          - "113x113x8x8"
+          - "127x127x8x8"
+          - "139x139x8x8"
+          - "157x157x8x8"
+          - "191x191x8x8"
+          - "223x223x8x8"
+          - "257x257x8x8"
+          - "17x17x50x50"
+          - "31x31x50x50"
+          - "47x47x50x50"
+          - "61x61x50x50"
+          - "79x79x50x50"
+          - "97x97x50x50"
+          - "113x113x50x50"
+          - "127x127x50x50"
+          - "139x139x50x50"
+          - "157x157x50x50"
+          - "191x191x50x50"
+          - "223x223x50x50"
+          - "257x257x50x50"
+        data_type: single
+        benchmark_type: Compute
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep_output: false
+      runs:
+        - name: basic
+          algorithm: nai_orig_n_to_m
+
+        - name: fft_orig
+          algorithm: fft_better_n_to_m
+
+        - name: nai_shuffle_multimat_both_work_distribution
+          algorithm: nai_shuffle_multimat_both_work_distribution_n_to_m
+          args:
+            warps_per_thread_block: 4
+            left_matrices_per_thread: 4
+            right_matrices_per_thread: 4
+            rows_per_thread: 1
+            distribution_type: "triangle"
+
+        - name: nai_shuffle_multirow_both_multimat_both
+          algorithm: nai_shuffle_multirow_both_multimat_both_n_to_m
+          args:
+            warps_per_thread_block: 4
+            shifts_per_thread_right_matrix: 4
+            # 4 and 4 matrices is better for larger number of input matrices
+            # at least 128x128
+            left_matrices_per_thread: 2
+            right_matrices_per_thread: 2
+            left_rows_per_iteration: 4
+
+        # Cannot be run on laptop
+        - name: nai_shuffle_multirow_both_multimat_both_large
+          algorithm: nai_shuffle_multirow_both_multimat_both_n_to_m
+          args:
+            warps_per_thread_block: 4
+            shifts_per_thread_right_matrix: 4
+            # 4 and 4 matrices is better for larger number of input matrices
+            # at least 128x128
+            left_matrices_per_thread: 4
+            right_matrices_per_thread: 4
+            left_rows_per_iteration: 4
