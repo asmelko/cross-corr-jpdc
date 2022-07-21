@@ -1,0 +1,212 @@
+benchmark:
+  name: fft
+  groups:
+    - name: single_one_to_one_steps
+      config:
+        sizes:
+          - "31x31x1x1"
+          - "32x32x1x1"
+          - "63x63x1x1"
+          - "64x64x1x1"
+          - "96x96x1x1"
+          - "127x127x1x1"
+          - "128x128x1x1"
+          - "160x160x1x1"
+          - "192x192x1x1"
+          - "224x224x1x1"
+          - "255x255x1x1"
+          - "256x256x1x1"
+          - "288x288x1x1"
+          - "320x320x1x1"
+          - "352x352x1x1"
+          - "384x384x1x1"
+          - "416x416x1x1"
+          - "448x448x1x1"
+          - "480x480x1x1"
+          - "511x511x1x1"
+          - "512x512x1x1"
+        data_type: single
+        benchmark_type: CommonSteps
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep: false
+      runs:
+        - name: fft_orig
+          algorithm: fft_orig_one_to_one
+
+    - name: single_one_to_one_computate
+      config:
+        sizes:
+          - "31x31x1x1"
+          - "32x32x1x1"
+          - "63x63x1x1"
+          - "64x64x1x1"
+          - "96x96x1x1"
+          - "127x127x1x1"
+          - "128x128x1x1"
+          - "160x160x1x1"
+          - "192x192x1x1"
+          - "224x224x1x1"
+          - "255x255x1x1"
+          - "256x256x1x1"
+          - "288x288x1x1"
+          - "320x320x1x1"
+          - "352x352x1x1"
+          - "384x384x1x1"
+          - "416x416x1x1"
+          - "448x448x1x1"
+          - "480x480x1x1"
+          - "511x511x1x1"
+          - "512x512x1x1"
+        data_type: single
+        benchmark_type: Compute
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep: false
+      runs:
+        - name: fft_orig
+          algorithm: fft_orig_one_to_one
+
+    - name: double_one_to_one_steps
+      config:
+        sizes:
+          - "31x31x1x1"
+          - "32x32x1x1"
+          - "63x63x1x1"
+          - "64x64x1x1"
+          - "96x96x1x1"
+          - "127x127x1x1"
+          - "128x128x1x1"
+          - "160x160x1x1"
+          - "192x192x1x1"
+          - "224x224x1x1"
+          - "255x255x1x1"
+          - "256x256x1x1"
+          - "288x288x1x1"
+          - "320x320x1x1"
+          - "352x352x1x1"
+          - "384x384x1x1"
+          - "416x416x1x1"
+          - "448x448x1x1"
+          - "480x480x1x1"
+          - "511x511x1x1"
+          - "512x512x1x1"
+        data_type: double
+        benchmark_type: CommonSteps
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep: false
+      runs:
+        - name: fft_orig
+          algorithm: fft_orig_one_to_one
+
+    - name: double_one_to_one_compute
+      config:
+        sizes:
+          - "31x31x1x1"
+          - "32x32x1x1"
+          - "63x63x1x1"
+          - "64x64x1x1"
+          - "96x96x1x1"
+          - "127x127x1x1"
+          - "128x128x1x1"
+          - "160x160x1x1"
+          - "192x192x1x1"
+          - "224x224x1x1"
+          - "255x255x1x1"
+          - "256x256x1x1"
+          - "288x288x1x1"
+          - "320x320x1x1"
+          - "352x352x1x1"
+          - "384x384x1x1"
+          - "416x416x1x1"
+          - "448x448x1x1"
+          - "480x480x1x1"
+          - "511x511x1x1"
+          - "512x512x1x1"
+        data_type: double
+        benchmark_type: Compute
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep: false
+      runs:
+        - name: fft_orig
+          algorithm: fft_orig_one_to_one
+
+    # - name: single_n_to_m
+    #   config:
+    #     sizes:
+    #       - "16x16x2x4"
+    #       - "32x32x2x4"
+    #       - "64x64x2x4"
+    #       - "128x128x2x4"
+    #       - "256x256x2x4"
+    #       - "512x512x2x4"
+    #       - "16x16x2x8"
+    #       - "32x32x2x8"
+    #       - "64x64x2x8"
+    #       - "128x128x2x8"
+    #       - "256x256x2x8"
+    #       - "512x512x2x8"
+    #       - "16x16x4x4"
+    #       - "32x32x4x4"
+    #       - "64x64x4x4"
+    #       - "128x128x4x4"
+    #       - "256x256x4x4"
+    #       - "512x512x4x4"
+    #       - "16x16x4x8"
+    #       - "32x32x4x8"
+    #       - "64x64x4x8"
+    #       - "128x128x4x8"
+    #       - "256x256x4x8"
+    #       - "512x512x4x8"
+    #     data_type: single
+    #     iterations: 50
+    #     validate: false
+    #     keep: false
+    #   runs:
+    #     - name: fft_better
+    #       algorithm: fft_better_n_to_m
+
+    # - name: double_n_to_m
+    #   config:
+    #     sizes:
+    #       - "16x16x2x4"
+    #       - "32x32x2x4"
+    #       - "64x64x2x4"
+    #       - "128x128x2x4"
+    #       - "256x256x2x4"
+    #       - "512x512x2x4"
+    #       - "16x16x2x8"
+    #       - "32x32x2x8"
+    #       - "64x64x2x8"
+    #       - "128x128x2x8"
+    #       - "256x256x2x8"
+    #       - "512x512x2x8"
+    #       - "16x16x4x4"
+    #       - "32x32x4x4"
+    #       - "64x64x4x4"
+    #       - "128x128x4x4"
+    #       - "256x256x4x4"
+    #       - "512x512x4x4"
+    #       - "16x16x4x8"
+    #       - "32x32x4x8"
+    #       - "64x64x4x8"
+    #       - "128x128x4x8"
+    #       - "256x256x4x8"
+    #       - "512x512x4x8"
+    #     data_type: double
+    #     iterations: 50
+    #     validate: false
+    #     keep: false
+    #   runs:
+    #     - name: fft_better
+    #       algorithm: fft_better_n_to_m

@@ -1,0 +1,142 @@
+benchmark:
+  name: LocalMem
+  groups:
+    - name: multirow
+      config:
+        sizes:
+          - "16x16x1x1"
+          - "32x32x1x1"
+          - "64x64x1x1"
+          - "128x128x1x1"
+          - "256x256x1x1"
+          - "512x512x1x1"
+        data_type: single
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep_output: false
+      runs:
+        - name: fixed
+          algorithm: nai_shuffle_multirow_both_one_to_one
+          args:
+            warps_per_thread_block: 16
+            shifts_per_thread: [2, 4]
+            left_rows_per_iteration: [2, 4]
+        - name: local_mem
+          algorithm: nai_shuffle_multirow_both_local_mem_one_to_one
+          args:
+            warps_per_thread_block: 16
+            shifts_per_thread: [2, 4]
+            left_rows_per_iteration: [2, 4]
+
+    - name: multimat
+      config:
+        sizes:
+          - "128x128x2x2"
+          - "256x256x2x2"
+          - "512x512x2x2"
+          - "128x128x2x4"
+          - "256x256x2x4"
+          - "512x512x2x4"
+          - "128x128x4x2"
+          - "256x256x4x2"
+          - "512x512x4x2"
+          - "128x128x4x4"
+          - "256x256x4x4"
+          - "512x512x4x4"
+        data_type: single
+        outer_iterations: 1
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep_output: false
+      runs:
+        - name: local_mem
+          algorithm: nai_shuffle_multimat_both_work_distribution_local_mem_n_to_m
+          args:
+            warps_per_thread_block: 16
+            left_matrices_per_thread: [2, 4]
+            right_matrices_per_thread: [2, 4]
+            rows_per_thread: 10
+            distribution_type: "triangle"
+
+        - name: no_local_mem
+          algorithm: nai_shuffle_multimat_both_work_distribution_n_to_m
+          args:
+            warps_per_thread_block: 16
+            left_matrices_per_thread: [2, 4]
+            right_matrices_per_thread: [2, 4]
+            rows_per_thread: 10
+            distribution_type: "triangle"
+
+    - name: multimat_for_text
+      config:
+        sizes:
+          - "16x16x4x4"
+          - "32x32x4x4"
+          - "64x64x4x4"
+          - "128x128x4x4"
+          - "192x192x4x4"
+          - "256x256x4x4"
+          - "320x320x4x4"
+          - "384x384x4x4"
+          - "448x448x4x4"
+          - "512x512x4x4"
+        data_type: single
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep_output: false
+      runs:
+        - name: local_mem
+          algorithm: nai_shuffle_multimat_both_work_distribution_local_mem_n_to_m
+          args:
+            warps_per_thread_block: 16
+            left_matrices_per_thread: 4
+            right_matrices_per_thread: 4
+            rows_per_thread: 10
+            distribution_type: "triangle"
+
+        - name: no_local_mem
+          algorithm: nai_shuffle_multimat_both_work_distribution_n_to_m
+          args:
+            warps_per_thread_block: 16
+            left_matrices_per_thread: 4
+            right_matrices_per_thread: 4
+            rows_per_thread: 10
+            distribution_type: "triangle"
+
+    - name: multirow_for_text
+      config:
+        sizes:
+          - "16x16x1x1"
+          - "32x32x1x1"
+          - "64x64x1x1"
+          - "128x128x1x1"
+          - "192x192x1x1"
+          - "256x256x1x1"
+          - "320x320x1x1"
+          - "384x384x1x1"
+          - "448x448x1x1"
+          - "512x512x1x1"
+        data_type: single
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep_output: false
+      runs:
+        - name: no_local_mem
+          algorithm: nai_shuffle_multirow_both_one_to_one
+          args:
+            warps_per_thread_block: 16
+            shifts_per_thread: 4
+            left_rows_per_iteration: 4
+        - name: local_mem
+          algorithm: nai_shuffle_multirow_both_local_mem_one_to_one
+          args:
+            warps_per_thread_block: 16
+            shifts_per_thread: 4
+            left_rows_per_iteration: 4

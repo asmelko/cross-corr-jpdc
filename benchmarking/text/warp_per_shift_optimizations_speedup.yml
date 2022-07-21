@@ -1,0 +1,56 @@
+benchmark:
+  groups:
+    - name: one_to_one
+      config:
+        sizes:
+          - "16x16x1x1"
+          - "20x20x1x1"
+          - "24x24x1x1"
+          - "28x28x1x1"
+          - "32x32x1x1"
+          - "64x64x1x1"
+          - "96x96x1x1"
+          - "128x128x1x1"
+          - "160x160x1x1"
+          - "192x192x1x1"
+          - "224x224x1x1"
+          - "256x256x1x1"
+          - "288x288x1x1"
+          - "320x320x1x1"
+          - "352x352x1x1"
+          - "384x384x1x1"
+          - "416x416x1x1"
+          - "448x448x1x1"
+          - "480x480x1x1"
+          - "512x512x1x1"
+        data_type: single
+        benchmark_type: Algorithm
+        outer_iterations: 2
+        inner_iterations: 10
+        min_measure_seconds: 1
+        validate: false
+        keep: false
+      runs:
+        - name: basic
+          algorithm: nai_orig_one_to_one
+        - name: nai_warp_per_shift
+          algorithm: nai_warp_per_shift_one_to_one
+          args:
+            shifts_per_thread_block: 16
+        - name: nai_warp_per_shift_work_distribution
+          algorithm: nai_warp_per_shift_work_distribution_one_to_one
+          args:
+            shifts_per_thread_block: 8
+            rows_per_warp: 10
+            distribution_type: "rectangle"
+        - name: nai_warp_per_shift_shared_mem
+          algorithm: nai_warp_per_shift_shared_mem_one_to_one
+          args:
+            shifts_per_thread_block: 16
+            shared_mem_row_size: 256
+            strided_load: true
+            column_group_per_block: true
+        - name: nai_block_per_shift
+          algorithm: nai_block_per_shift_one_to_one
+          args:
+            block_size: 128
