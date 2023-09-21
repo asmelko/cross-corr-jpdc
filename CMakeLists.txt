@@ -19,19 +19,19 @@ set(ALG_LIMIT_OPTIONS
         "SHUFFLE_MULTIROW_RIGHT_RIGHT_ROWS_LIMIT:8:4:Maximum value of right_rows to generate code for"
 
         "SHUFFLE_MULTIROW_BOTH_SHIFTS_PER_THREAD_LIMIT:8:4:Maximum value of shifts_per_thread to generate code for"
-        "SHUFFLE_MULTIROW_BOTH_LEFT_ROWS_LIMIT:4:2:Maximum value of left_rows to generate code for"
+        "SHUFFLE_MULTIROW_BOTH_LEFT_ROWS_LIMIT:8:2:Maximum value of left_rows to generate code for"
 
-        "SHUFFLE_MULTIROW_BOTH_LOCAL_MEM_SHIFTS_PER_THREAD_LIMIT:8:4:Maximum value of shifts_per_thread to generate code for"
-        "SHUFFLE_MULTIROW_BOTH_LOCAL_MEM_LEFT_ROWS_LIMIT:4:2:Maximum value of left_rows to generate code for"
+        "SHUFFLE_MULTIROW_BOTH_LOCAL_MEM_SHIFTS_PER_THREAD_LIMIT:1:4:Maximum value of shifts_per_thread to generate code for"
+        "SHUFFLE_MULTIROW_BOTH_LOCAL_MEM_LEFT_ROWS_LIMIT:1:2:Maximum value of left_rows to generate code for"
 
-        "SHUFFLE_MULTIROW_RIGHT_MULTIMAT_RIGHT_RIGHT_ROWS_LIMIT:4:2:Maximum value of right_rows to generate code for"
-        "SHUFFLE_MULTIROW_RIGHT_MULTIMAT_RIGHT_RIGHT_MATS_LIMIT:4:2:Maximum value of right_mats to generate code for"
+        "SHUFFLE_MULTIROW_RIGHT_MULTIMAT_RIGHT_RIGHT_ROWS_LIMIT:8:2:Maximum value of right_rows to generate code for"
+        "SHUFFLE_MULTIROW_RIGHT_MULTIMAT_RIGHT_RIGHT_MATS_LIMIT:8:2:Maximum value of right_mats to generate code for"
 
-        "SHUFFLE_N_TO_M_MULTIMAT_BOTH_LEFT_MATRICES_PER_THREAD_LIMIT:4:2:Maximum value of left_matrices_per_thread to generate code for"
-        "SHUFFLE_N_TO_M_MULTIMAT_BOTH_RIGHT_MATRICES_PER_THREAD_LIMIT:4:2:Maximum value of right_matrices_per_thread to generate code for"
+        "SHUFFLE_N_TO_M_MULTIMAT_BOTH_LEFT_MATRICES_PER_THREAD_LIMIT:8:2:Maximum value of left_matrices_per_thread to generate code for"
+        "SHUFFLE_N_TO_M_MULTIMAT_BOTH_RIGHT_MATRICES_PER_THREAD_LIMIT:8:2:Maximum value of right_matrices_per_thread to generate code for"
 
-        "SHUFFLE_N_TO_M_MULTIMAT_BOTH_LOCAL_MEM_LEFT_MATRICES_PER_THREAD_LIMIT:4:2:Maximum value of left_matrices_per_thread to generate code for"
-        "SHUFFLE_N_TO_M_MULTIMAT_BOTH_LOCAL_MEM_RIGHT_MATRICES_PER_THREAD_LIMIT:4:2:Maximum value of right_matrices_per_thread to generate code for"
+        "SHUFFLE_N_TO_M_MULTIMAT_BOTH_LOCAL_MEM_LEFT_MATRICES_PER_THREAD_LIMIT:1:2:Maximum value of left_matrices_per_thread to generate code for"
+        "SHUFFLE_N_TO_M_MULTIMAT_BOTH_LOCAL_MEM_RIGHT_MATRICES_PER_THREAD_LIMIT:1:2:Maximum value of right_matrices_per_thread to generate code for"
 
         "SHUFFLE_N_TO_M_MULTIROW_BOTH_MULTIMAT_BOTH_SHIFTS_PER_THREAD_PER_RIGHT_MATRIX_LIMIT:4:2:Maximum value of shifts_per_thread_per_right_matrix to generate code for"
         "SHUFFLE_N_TO_M_MULTIROW_BOTH_MULTIMAT_BOTH_RIGHT_MATRICES_PER_THREAD_LIMIT:4:2:Maximum value of right_matrices_per_thread to generate code for"
@@ -114,10 +114,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 # Requires cmake 3.18
-set(CMAKE_CUDA_ARCHITECTURES 70 75 80)
+set(CMAKE_CUDA_ARCHITECTURES 70-real)
 
 # See https://stackoverflow.com/questions/27018340/cmake-does-not-properly-find-cuda-library
-FIND_PACKAGE(CUDAToolkit 11.4 REQUIRED)
+FIND_PACKAGE(CUDAToolkit 12.2 REQUIRED)
 FIND_PACKAGE(Boost 1.71 COMPONENTS program_options REQUIRED)
 # apt install nlohmann-json3-dev
 FIND_PACKAGE(nlohmann_json 3.7.3 REQUIRED)
@@ -166,7 +166,7 @@ target_link_libraries(cross PRIVATE nlohmann_json::nlohmann_json)
 target_compile_options(cross PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>)
 target_compile_options(cross PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--compiler-options=-Wall,-Wextra>)
 
-target_compile_options(cross PRIVATE $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Release>>:-lineinfo>)
+# target_compile_options(cross PRIVATE $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Release>>:-lineinfo>)
 
 target_compile_options(cross PRIVATE $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CONFIG:Debug>>:-g -rdynamic>)
 target_compile_options(cross PRIVATE $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>:-G -Xcompiler -rdynamic>)
