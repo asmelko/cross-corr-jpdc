@@ -676,16 +676,16 @@ void run_ccn_shuffle_multirow_both(
     );
 }
 
-template void run_ccn_shuffle_multirow_both<int, int>(
-        const int* __restrict__ left,
-        const int* __restrict__ right,
-        int* __restrict__ out,
-        dsize2_t matrix_size,
-        dsize2_t search_size,
-        dsize_t warps_per_thread_block,
-        dsize_t max_shifts_per_thread,
-        dsize_t max_left_rows
-);
+// template void run_ccn_shuffle_multirow_both<int, int>(
+//         const int* __restrict__ left,
+//         const int* __restrict__ right,
+//         int* __restrict__ out,
+//         dsize2_t matrix_size,
+//         dsize2_t search_size,
+//         dsize_t warps_per_thread_block,
+//         dsize_t max_shifts_per_thread,
+//         dsize_t max_left_rows
+// );
 
 template void run_ccn_shuffle_multirow_both<float, float>(
         const float* __restrict__ left,
@@ -698,15 +698,15 @@ template void run_ccn_shuffle_multirow_both<float, float>(
         dsize_t max_left_rows
 );
 
-template void run_ccn_shuffle_multirow_both<double, double>(
-        const double* __restrict__ left,
-        const double* __restrict__ right,
-        double* __restrict__ out,
-        dsize2_t matrix_size,
-        dsize2_t search_size,
-        dsize_t warps_per_thread_block,
-        dsize_t max_shifts_per_thread,
-        dsize_t max_left_rows
-);
+// template void run_ccn_shuffle_multirow_both<double, double>(
+//         const double* __restrict__ left,
+//         const double* __restrict__ right,
+//         double* __restrict__ out,
+//         dsize2_t matrix_size,
+//         dsize2_t search_size,
+//         dsize_t warps_per_thread_block,
+//         dsize_t max_shifts_per_thread,
+//         dsize_t max_left_rows
+// );
 
 }

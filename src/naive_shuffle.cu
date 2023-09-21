@@ -524,14 +524,14 @@ void run_ccn_shuffle_work_distribution(
     );
 }
 
-template void run_ccn_shuffle<int, int>(
-        const int* __restrict__ left,
-        const int* __restrict__ right,
-        int* __restrict__ out,
-        dsize2_t matrix_size,
-        dsize2_t search_size,
-        dsize_t warps_per_thread_block
-);
+// template void run_ccn_shuffle<int, int>(
+//         const int* __restrict__ left,
+//         const int* __restrict__ right,
+//         int* __restrict__ out,
+//         dsize2_t matrix_size,
+//         dsize2_t search_size,
+//         dsize_t warps_per_thread_block
+// );
 
 template void run_ccn_shuffle<float, float>(
         const float* __restrict__ left,
@@ -542,25 +542,25 @@ template void run_ccn_shuffle<float, float>(
         dsize_t warps_per_thread_block
 );
 
-template void run_ccn_shuffle<double, double>(
-        const double* __restrict__ left,
-        const double* __restrict__ right,
-        double* __restrict__ out,
-        dsize2_t matrix_size,
-        dsize2_t search_size,
-        dsize_t warps_per_thread_block
-);
+// template void run_ccn_shuffle<double, double>(
+//         const double* __restrict__ left,
+//         const double* __restrict__ right,
+//         double* __restrict__ out,
+//         dsize2_t matrix_size,
+//         dsize2_t search_size,
+//         dsize_t warps_per_thread_block
+// );
 
-template void run_ccn_shuffle_work_distribution<triangle_distribution, int, int>(
-    const int* __restrict__ left,
-    const int* __restrict__ right,
-    int* __restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t warps_per_thread_block,
-    dsize_t max_rows_per_thread,
-    cudaStream_t cuda_stream
-);
+// template void run_ccn_shuffle_work_distribution<triangle_distribution, int, int>(
+//     const int* __restrict__ left,
+//     const int* __restrict__ right,
+//     int* __restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t warps_per_thread_block,
+//     dsize_t max_rows_per_thread,
+//     cudaStream_t cuda_stream
+// );
 
 template void run_ccn_shuffle_work_distribution<triangle_distribution, float, float>(
     const float* __restrict__ left,
@@ -573,27 +573,27 @@ template void run_ccn_shuffle_work_distribution<triangle_distribution, float, fl
     cudaStream_t cuda_stream
 );
 
-template void run_ccn_shuffle_work_distribution<triangle_distribution, double, double>(
-    const double* __restrict__ left,
-    const double* __restrict__ right,
-    double* __restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t warps_per_thread_block,
-    dsize_t max_rows_per_thread,
-    cudaStream_t cuda_stream
-);
+// template void run_ccn_shuffle_work_distribution<triangle_distribution, double, double>(
+//     const double* __restrict__ left,
+//     const double* __restrict__ right,
+//     double* __restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t warps_per_thread_block,
+//     dsize_t max_rows_per_thread,
+//     cudaStream_t cuda_stream
+// );
 
-template void run_ccn_shuffle_work_distribution<rectangle_distribution, int, int>(
-    const int* __restrict__ left,
-    const int* __restrict__ right,
-    int* __restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t warps_per_thread_block,
-    dsize_t max_rows_per_thread,
-    cudaStream_t cuda_stream
-);
+// template void run_ccn_shuffle_work_distribution<rectangle_distribution, int, int>(
+//     const int* __restrict__ left,
+//     const int* __restrict__ right,
+//     int* __restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t warps_per_thread_block,
+//     dsize_t max_rows_per_thread,
+//     cudaStream_t cuda_stream
+// );
 
 template void run_ccn_shuffle_work_distribution<rectangle_distribution, float, float>(
     const float* __restrict__ left,
@@ -606,27 +606,27 @@ template void run_ccn_shuffle_work_distribution<rectangle_distribution, float, f
     cudaStream_t cuda_stream
 );
 
-template void run_ccn_shuffle_work_distribution<rectangle_distribution, double, double>(
-    const double* __restrict__ left,
-    const double* __restrict__ right,
-    double* __restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t warps_per_thread_block,
-    dsize_t max_rows_per_thread,
-    cudaStream_t cuda_stream
-);
+// template void run_ccn_shuffle_work_distribution<rectangle_distribution, double, double>(
+//     const double* __restrict__ left,
+//     const double* __restrict__ right,
+//     double* __restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t warps_per_thread_block,
+//     dsize_t max_rows_per_thread,
+//     cudaStream_t cuda_stream
+// );
 
-template void run_ccn_shuffle_work_distribution<no_distribution, int, int>(
-    const int* __restrict__ left,
-    const int* __restrict__ right,
-    int* __restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t warps_per_thread_block,
-    dsize_t max_rows_per_thread,
-    cudaStream_t cuda_stream
-);
+// template void run_ccn_shuffle_work_distribution<no_distribution, int, int>(
+//     const int* __restrict__ left,
+//     const int* __restrict__ right,
+//     int* __restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t warps_per_thread_block,
+//     dsize_t max_rows_per_thread,
+//     cudaStream_t cuda_stream
+// );
 
 template void run_ccn_shuffle_work_distribution<no_distribution, float, float>(
     const float* __restrict__ left,
@@ -639,15 +639,15 @@ template void run_ccn_shuffle_work_distribution<no_distribution, float, float>(
     cudaStream_t cuda_stream
 );
 
-template void run_ccn_shuffle_work_distribution<no_distribution, double, double>(
-    const double* __restrict__ left,
-    const double* __restrict__ right,
-    double* __restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t warps_per_thread_block,
-    dsize_t max_rows_per_thread,
-    cudaStream_t cuda_stream
-);
+// template void run_ccn_shuffle_work_distribution<no_distribution, double, double>(
+//     const double* __restrict__ left,
+//     const double* __restrict__ right,
+//     double* __restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t warps_per_thread_block,
+//     dsize_t max_rows_per_thread,
+//     cudaStream_t cuda_stream
+// );
 
 }

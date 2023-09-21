@@ -688,21 +688,21 @@ void run_ccn_warp_per_shift_shared_mem(
     );
 }
 
-template void run_ccn_warp_per_shift_shared_mem<int, int>(
-    const int* __restrict__ left,
-    const int* __restrict__ right,
-    int* __restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t num_right_matrices,
-    dsize_t shifts_per_cuda_block,
-    dsize_t shared_mem_row_size,
-    dsize_t shared_mem_rows,
-    dsize_t right_matrices_per_block,
-    bool strided_load,
-    bool column_group_per_block,
-    cudaStream_t cuda_stream
-);
+// template void run_ccn_warp_per_shift_shared_mem<int, int>(
+//     const int* __restrict__ left,
+//     const int* __restrict__ right,
+//     int* __restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t num_right_matrices,
+//     dsize_t shifts_per_cuda_block,
+//     dsize_t shared_mem_row_size,
+//     dsize_t shared_mem_rows,
+//     dsize_t right_matrices_per_block,
+//     bool strided_load,
+//     bool column_group_per_block,
+//     cudaStream_t cuda_stream
+// );
 
 template void run_ccn_warp_per_shift_shared_mem<float, float>(
     const float* __restrict__ left,
@@ -720,20 +720,20 @@ template void run_ccn_warp_per_shift_shared_mem<float, float>(
     cudaStream_t cuda_stream
 );
 
-template void run_ccn_warp_per_shift_shared_mem<double, double>(
-    const double* __restrict__ left,
-    const double* __restrict__ right,
-    double* __restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t num_right_matrices,
-    dsize_t shifts_per_cuda_block,
-    dsize_t shared_mem_row_size,
-    dsize_t shared_mem_rows,
-    dsize_t right_matrices_per_block,
-    bool strided_load,
-    bool column_group_per_block,
-    cudaStream_t cuda_stream
-);
+// template void run_ccn_warp_per_shift_shared_mem<double, double>(
+//     const double* __restrict__ left,
+//     const double* __restrict__ right,
+//     double* __restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t num_right_matrices,
+//     dsize_t shifts_per_cuda_block,
+//     dsize_t shared_mem_row_size,
+//     dsize_t shared_mem_rows,
+//     dsize_t right_matrices_per_block,
+//     bool strided_load,
+//     bool column_group_per_block,
+//     cudaStream_t cuda_stream
+// );
 
 }

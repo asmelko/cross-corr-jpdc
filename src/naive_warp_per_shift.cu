@@ -398,14 +398,14 @@ void run_ccn_warp_per_shift_simple_indexing(
     warp_per_shift_kernel_args::record_launch(num_threads, num_blocks);
 }
 
-template void run_ccn_warp_per_shift<int, int>(
-    const int* __restrict__ left,
-    const int* __restrict__ right,
-    int* __restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t shifts_per_thread_block
-);
+// template void run_ccn_warp_per_shift<int, int>(
+//     const int* __restrict__ left,
+//     const int* __restrict__ right,
+//     int* __restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t shifts_per_thread_block
+// );
 
 template void run_ccn_warp_per_shift<float, float>(
     const float* __restrict__ left,
@@ -416,23 +416,23 @@ template void run_ccn_warp_per_shift<float, float>(
     dsize_t shifts_per_thread_block
 );
 
-template void run_ccn_warp_per_shift<double, double>(
-    const double* __restrict__ left,
-    const double* __restrict__ right,
-    double* __restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t shifts_per_thread_block
-);
+// template void run_ccn_warp_per_shift<double, double>(
+//     const double* __restrict__ left,
+//     const double* __restrict__ right,
+//     double* __restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t shifts_per_thread_block
+// );
 
-template void run_ccn_warp_per_shift_simple_indexing<int, int>(
-    const int* __restrict__ left,
-    const int* __restrict__ right,
-    int* __restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t shifts_per_thread_block
-);
+// template void run_ccn_warp_per_shift_simple_indexing<int, int>(
+//     const int* __restrict__ left,
+//     const int* __restrict__ right,
+//     int* __restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t shifts_per_thread_block
+// );
 
 template void run_ccn_warp_per_shift_simple_indexing<float, float>(
     const float* __restrict__ left,
@@ -443,24 +443,24 @@ template void run_ccn_warp_per_shift_simple_indexing<float, float>(
     dsize_t shifts_per_thread_block
 );
 
-template void run_ccn_warp_per_shift_simple_indexing<double, double>(
-    const double* __restrict__ left,
-    const double* __restrict__ right,
-    double* __restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t shifts_per_thread_block
-);
+// template void run_ccn_warp_per_shift_simple_indexing<double, double>(
+//     const double* __restrict__ left,
+//     const double* __restrict__ right,
+//     double* __restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t shifts_per_thread_block
+// );
 
-template void run_ccn_warp_per_shift_work_distribution<triangle_distribution, int, int>(
-    const int* __restrict__ left,
-    const int* __restrict__ right,
-    int* __restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t shifts_per_thread_block,
-    dsize_t max_rows_per_warp
-);
+// template void run_ccn_warp_per_shift_work_distribution<triangle_distribution, int, int>(
+//     const int* __restrict__ left,
+//     const int* __restrict__ right,
+//     int* __restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t shifts_per_thread_block,
+//     dsize_t max_rows_per_warp
+// );
 
 template void run_ccn_warp_per_shift_work_distribution<triangle_distribution, float, float>(
     const float* __restrict__ left,
@@ -472,25 +472,25 @@ template void run_ccn_warp_per_shift_work_distribution<triangle_distribution, fl
     dsize_t max_rows_per_warp
 );
 
-template void run_ccn_warp_per_shift_work_distribution<triangle_distribution, double, double>(
-    const double* __restrict__ left,
-    const double* __restrict__ right,
-    double* __restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t shifts_per_thread_block,
-    dsize_t max_rows_per_warp
-);
+// template void run_ccn_warp_per_shift_work_distribution<triangle_distribution, double, double>(
+//     const double* __restrict__ left,
+//     const double* __restrict__ right,
+//     double* __restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t shifts_per_thread_block,
+//     dsize_t max_rows_per_warp
+// );
 
-template void run_ccn_warp_per_shift_work_distribution<rectangle_distribution, int, int>(
-    const int* __restrict__ left,
-    const int* __restrict__ right,
-    int* __restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t shifts_per_thread_block,
-    dsize_t max_rows_per_warp
-);
+// template void run_ccn_warp_per_shift_work_distribution<rectangle_distribution, int, int>(
+//     const int* __restrict__ left,
+//     const int* __restrict__ right,
+//     int* __restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t shifts_per_thread_block,
+//     dsize_t max_rows_per_warp
+// );
 
 template void run_ccn_warp_per_shift_work_distribution<rectangle_distribution, float, float>(
     const float* __restrict__ left,
@@ -502,25 +502,25 @@ template void run_ccn_warp_per_shift_work_distribution<rectangle_distribution, f
     dsize_t max_rows_per_warp
 );
 
-template void run_ccn_warp_per_shift_work_distribution<rectangle_distribution, double, double>(
-    const double* __restrict__ left,
-    const double* __restrict__ right,
-    double* __restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t shifts_per_thread_block,
-    dsize_t max_rows_per_warp
-);
+// template void run_ccn_warp_per_shift_work_distribution<rectangle_distribution, double, double>(
+//     const double* __restrict__ left,
+//     const double* __restrict__ right,
+//     double* __restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t shifts_per_thread_block,
+//     dsize_t max_rows_per_warp
+// );
 
-template void run_ccn_warp_per_shift_work_distribution<no_distribution, int, int>(
-    const int* __restrict__ left,
-    const int* __restrict__ right,
-    int* __restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t shifts_per_thread_block,
-    dsize_t max_rows_per_warp
-);
+// template void run_ccn_warp_per_shift_work_distribution<no_distribution, int, int>(
+//     const int* __restrict__ left,
+//     const int* __restrict__ right,
+//     int* __restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t shifts_per_thread_block,
+//     dsize_t max_rows_per_warp
+// );
 
 template void run_ccn_warp_per_shift_work_distribution<no_distribution, float, float>(
     const float* __restrict__ left,
@@ -532,15 +532,15 @@ template void run_ccn_warp_per_shift_work_distribution<no_distribution, float, f
     dsize_t max_rows_per_warp
 );
 
-template void run_ccn_warp_per_shift_work_distribution<no_distribution, double, double>(
-    const double* __restrict__ left,
-    const double* __restrict__ right,
-    double* __restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t shifts_per_thread_block,
-    dsize_t max_rows_per_warp
-);
+// template void run_ccn_warp_per_shift_work_distribution<no_distribution, double, double>(
+//     const double* __restrict__ left,
+//     const double* __restrict__ right,
+//     double* __restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t shifts_per_thread_block,
+//     dsize_t max_rows_per_warp
+// );
 
 
 }

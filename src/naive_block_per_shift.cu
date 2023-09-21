@@ -161,14 +161,14 @@ void run_ccn_block_per_shift(
     );
 }
 
-template void run_ccn_block_per_shift<int, int>(
-    const int* __restrict__ left,
-    const int* __restrict__ right,
-    int* __restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t cuda_block_size
-);
+// template void run_ccn_block_per_shift<int, int>(
+//     const int* __restrict__ left,
+//     const int* __restrict__ right,
+//     int* __restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t cuda_block_size
+// );
 
 template void run_ccn_block_per_shift<float, float>(
     const float* __restrict__ left,
@@ -179,13 +179,13 @@ template void run_ccn_block_per_shift<float, float>(
     dsize_t cuda_block_size
 );
 
-template void run_ccn_block_per_shift<double, double>(
-    const double* __restrict__ left,
-    const double* __restrict__ right,
-    double* __restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t cuda_block_size
-);
+// template void run_ccn_block_per_shift<double, double>(
+//     const double* __restrict__ left,
+//     const double* __restrict__ right,
+//     double* __restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t cuda_block_size
+// );
 
 }

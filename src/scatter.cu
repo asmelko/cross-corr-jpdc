@@ -113,26 +113,26 @@ template void run_scatter<float>(
     dsize_t items_per_threads
 );
 
-template void run_scatter<double>(
-    const double* __restrict__ src,
-    double* __restrict__ dst,
-    dsize2_t src_matrix_size,
-    dsize_t src_num_matrices,
-    dsize2_t dst_matrix_size,
-    dsize2_t dst_pos,
-    dsize_t threads_per_block,
-    dsize_t items_per_threads
-);
+// template void run_scatter<double>(
+//     const double* __restrict__ src,
+//     double* __restrict__ dst,
+//     dsize2_t src_matrix_size,
+//     dsize_t src_num_matrices,
+//     dsize2_t dst_matrix_size,
+//     dsize2_t dst_pos,
+//     dsize_t threads_per_block,
+//     dsize_t items_per_threads
+// );
 
-template void run_scatter<int>(
-    const int* __restrict__ src,
-    int* __restrict__ dst,
-    dsize2_t src_matrix_size,
-    dsize_t src_num_matrices,
-    dsize2_t dst_matrix_size,
-    dsize2_t dst_pos,
-    dsize_t threads_per_block,
-    dsize_t items_per_threads
-);
+// template void run_scatter<int>(
+//     const int* __restrict__ src,
+//     int* __restrict__ dst,
+//     dsize2_t src_matrix_size,
+//     dsize_t src_num_matrices,
+//     dsize2_t dst_matrix_size,
+//     dsize2_t dst_pos,
+//     dsize_t threads_per_block,
+//     dsize_t items_per_threads
+// );
 
 }

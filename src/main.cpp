@@ -430,8 +430,8 @@ int run_data_type_dispatch(
 ) {
     if (args.data_type == "single") {
         return run_alg_type_dispatch<float, BENCH_TYPE>(args);
-    } else if (args.data_type == "double") {
-        return run_alg_type_dispatch<double, BENCH_TYPE> (args);
+    // } else if (args.data_type == "double") {
+    //     return run_alg_type_dispatch<double, BENCH_TYPE> (args);
     } else {
         std::cerr << "Unknown data type " << args.data_type << "\n";
         return 1;

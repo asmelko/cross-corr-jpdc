@@ -677,19 +677,19 @@ void run_ccn_shuffle_n_to_m_multimat_both_work_distribution(
     );
 }
 
-template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<triangle_distribution, int, int>(
-    const int *__restrict__ left,
-    const int *__restrict__ right,
-    int *__restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t num_left_matrices,
-    dsize_t num_right_matrices,
-    dsize_t warps_per_thread_block,
-    dsize_t left_matrices_per_thread,
-    dsize_t right_matrices_per_thread,
-    dsize_t max_rows_per_thread
-);
+// template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<triangle_distribution, int, int>(
+//     const int *__restrict__ left,
+//     const int *__restrict__ right,
+//     int *__restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t num_left_matrices,
+//     dsize_t num_right_matrices,
+//     dsize_t warps_per_thread_block,
+//     dsize_t left_matrices_per_thread,
+//     dsize_t right_matrices_per_thread,
+//     dsize_t max_rows_per_thread
+// );
 
 template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<triangle_distribution, float, float>(
     const float *__restrict__ left,
@@ -705,33 +705,33 @@ template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<triangle_di
     dsize_t max_rows_per_thread
 );
 
-template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<triangle_distribution, double, double>(
-    const double *__restrict__ left,
-    const double *__restrict__ right,
-    double *__restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t num_left_matrices,
-    dsize_t num_right_matrices,
-    dsize_t warps_per_thread_block,
-    dsize_t left_matrices_per_thread,
-    dsize_t right_matrices_per_thread,
-    dsize_t max_rows_per_thread
-);
+// template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<triangle_distribution, double, double>(
+//     const double *__restrict__ left,
+//     const double *__restrict__ right,
+//     double *__restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t num_left_matrices,
+//     dsize_t num_right_matrices,
+//     dsize_t warps_per_thread_block,
+//     dsize_t left_matrices_per_thread,
+//     dsize_t right_matrices_per_thread,
+//     dsize_t max_rows_per_thread
+// );
 
-template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<rectangle_distribution, int, int>(
-    const int *__restrict__ left,
-    const int *__restrict__ right,
-    int *__restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t num_left_matrices,
-    dsize_t num_right_matrices,
-    dsize_t warps_per_thread_block,
-    dsize_t left_matrices_per_thread,
-    dsize_t right_matrices_per_thread,
-    dsize_t max_rows_per_thread
-);
+// template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<rectangle_distribution, int, int>(
+//     const int *__restrict__ left,
+//     const int *__restrict__ right,
+//     int *__restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t num_left_matrices,
+//     dsize_t num_right_matrices,
+//     dsize_t warps_per_thread_block,
+//     dsize_t left_matrices_per_thread,
+//     dsize_t right_matrices_per_thread,
+//     dsize_t max_rows_per_thread
+// );
 
 template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<rectangle_distribution, float, float>(
     const float *__restrict__ left,
@@ -747,33 +747,33 @@ template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<rectangle_d
     dsize_t max_rows_per_thread
 );
 
-template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<rectangle_distribution, double, double>(
-    const double *__restrict__ left,
-    const double *__restrict__ right,
-    double *__restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t num_left_matrices,
-    dsize_t num_right_matrices,
-    dsize_t warps_per_thread_block,
-    dsize_t left_matrices_per_thread,
-    dsize_t right_matrices_per_thread,
-    dsize_t max_rows_per_thread
-);
+// template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<rectangle_distribution, double, double>(
+//     const double *__restrict__ left,
+//     const double *__restrict__ right,
+//     double *__restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t num_left_matrices,
+//     dsize_t num_right_matrices,
+//     dsize_t warps_per_thread_block,
+//     dsize_t left_matrices_per_thread,
+//     dsize_t right_matrices_per_thread,
+//     dsize_t max_rows_per_thread
+// );
 
-template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<no_distribution, int, int>(
-    const int *__restrict__ left,
-    const int *__restrict__ right,
-    int *__restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t num_left_matrices,
-    dsize_t num_right_matrices,
-    dsize_t warps_per_thread_block,
-    dsize_t left_matrices_per_thread,
-    dsize_t right_matrices_per_thread,
-    dsize_t max_rows_per_thread
-);
+// template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<no_distribution, int, int>(
+//     const int *__restrict__ left,
+//     const int *__restrict__ right,
+//     int *__restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t num_left_matrices,
+//     dsize_t num_right_matrices,
+//     dsize_t warps_per_thread_block,
+//     dsize_t left_matrices_per_thread,
+//     dsize_t right_matrices_per_thread,
+//     dsize_t max_rows_per_thread
+// );
 
 template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<no_distribution, float, float>(
     const float *__restrict__ left,
@@ -789,18 +789,18 @@ template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<no_distribu
     dsize_t max_rows_per_thread
 );
 
-template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<no_distribution, double, double>(
-    const double *__restrict__ left,
-    const double *__restrict__ right,
-    double *__restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t num_left_matrices,
-    dsize_t num_right_matrices,
-    dsize_t warps_per_thread_block,
-    dsize_t left_matrices_per_thread,
-    dsize_t right_matrices_per_thread,
-    dsize_t max_rows_per_thread
-);
+// template void run_ccn_shuffle_n_to_m_multimat_both_work_distribution<no_distribution, double, double>(
+//     const double *__restrict__ left,
+//     const double *__restrict__ right,
+//     double *__restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t num_left_matrices,
+//     dsize_t num_right_matrices,
+//     dsize_t warps_per_thread_block,
+//     dsize_t left_matrices_per_thread,
+//     dsize_t right_matrices_per_thread,
+//     dsize_t max_rows_per_thread
+// );
 
 }

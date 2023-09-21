@@ -1020,20 +1020,20 @@ void run_ccn_n_to_m_shuffle_multirow_both_multimat_both(
     );
 }
 
-template void run_ccn_n_to_m_shuffle_multirow_both_multimat_both<int, int>(
-    const int* __restrict__ left,
-    const int* __restrict__ right,
-    int* __restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t num_left_matrices,
-    dsize_t num_right_matrices,
-    dsize_t warps_per_thread_block,
-    dsize_t shifts_per_thread_right_matrix,
-    dsize_t left_matrices_per_thread,
-    dsize_t right_matrices_per_thread,
-    dsize_t left_rows_per_iteration
-);
+// template void run_ccn_n_to_m_shuffle_multirow_both_multimat_both<int, int>(
+//     const int* __restrict__ left,
+//     const int* __restrict__ right,
+//     int* __restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t num_left_matrices,
+//     dsize_t num_right_matrices,
+//     dsize_t warps_per_thread_block,
+//     dsize_t shifts_per_thread_right_matrix,
+//     dsize_t left_matrices_per_thread,
+//     dsize_t right_matrices_per_thread,
+//     dsize_t left_rows_per_iteration
+// );
 
 template void run_ccn_n_to_m_shuffle_multirow_both_multimat_both<float, float>(
     const float* __restrict__ left,
@@ -1050,19 +1050,19 @@ template void run_ccn_n_to_m_shuffle_multirow_both_multimat_both<float, float>(
     dsize_t left_rows_per_iteration
 );
 
-template void run_ccn_n_to_m_shuffle_multirow_both_multimat_both<double, double>(
-    const double* __restrict__ left,
-    const double* __restrict__ right,
-    double* __restrict__ out,
-    dsize2_t matrix_size,
-    dsize2_t search_size,
-    dsize_t num_left_matrices,
-    dsize_t num_right_matrices,
-    dsize_t warps_per_thread_block,
-    dsize_t shifts_per_thread_right_matrix,
-    dsize_t left_matrices_per_thread,
-    dsize_t right_matrices_per_thread,
-    dsize_t left_rows_per_iteration
-);
+// template void run_ccn_n_to_m_shuffle_multirow_both_multimat_both<double, double>(
+//     const double* __restrict__ left,
+//     const double* __restrict__ right,
+//     double* __restrict__ out,
+//     dsize2_t matrix_size,
+//     dsize2_t search_size,
+//     dsize_t num_left_matrices,
+//     dsize_t num_right_matrices,
+//     dsize_t warps_per_thread_block,
+//     dsize_t shifts_per_thread_right_matrix,
+//     dsize_t left_matrices_per_thread,
+//     dsize_t right_matrices_per_thread,
+//     dsize_t left_rows_per_iteration
+// );
 
 }

@@ -160,16 +160,16 @@ void run_cross_corr_naive_original(
     );
 }
 
-template void run_cross_corr_naive_original<int, int>(
-    const int* __restrict__ ref,
-    const int* __restrict__ deformed,
-    int* __restrict__ out,
-    dsize2_t subregion_size,
-    dsize2_t search_size,
-    dsize_t subregions_per_pic,
-    dsize_t batch_size,
-    cudaStream_t cuda_stream
-);
+// template void run_cross_corr_naive_original<int, int>(
+//     const int* __restrict__ ref,
+//     const int* __restrict__ deformed,
+//     int* __restrict__ out,
+//     dsize2_t subregion_size,
+//     dsize2_t search_size,
+//     dsize_t subregions_per_pic,
+//     dsize_t batch_size,
+//     cudaStream_t cuda_stream
+// );
 
 template void run_cross_corr_naive_original<float, float>(
     const float* __restrict__ ref,
@@ -182,15 +182,15 @@ template void run_cross_corr_naive_original<float, float>(
     cudaStream_t cuda_stream
 );
 
-template void run_cross_corr_naive_original<double, double>(
-    const double* __restrict__ ref,
-    const double* __restrict__ deformed,
-    double* __restrict__ out,
-    dsize2_t subregion_size,
-    dsize2_t search_size,
-    dsize_t subregions_per_pic,
-    dsize_t batch_size,
-    cudaStream_t cuda_stream
-);
+// template void run_cross_corr_naive_original<double, double>(
+//     const double* __restrict__ ref,
+//     const double* __restrict__ deformed,
+//     double* __restrict__ out,
+//     dsize2_t subregion_size,
+//     dsize2_t search_size,
+//     dsize_t subregions_per_pic,
+//     dsize_t batch_size,
+//     cudaStream_t cuda_stream
+// );
 
 }
