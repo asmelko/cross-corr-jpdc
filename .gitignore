@@ -8,3 +8,4 @@ cmake-build-debug
 __pycache__
 benchmarking/benchmarks
 benchmarking/validation/validation
+benchmarking/jpdc/jpdc-results
