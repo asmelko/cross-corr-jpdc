@@ -114,7 +114,7 @@ protected:
 
         cuda_malloc(&d_ref_, ref_.size());
         cuda_malloc(&d_target_, target_.size());
-        cuda_malloc(&d_result_, result_.size());
+        cuda_malloc(&d_result_, result_.size() * saturation_multiplier);
     }
 
     void transfer_impl() override {

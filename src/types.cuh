@@ -13,6 +13,8 @@ using dsize_t = unsigned int;
 using ddiff_t = int;
 using dpos_t = unsigned int;
 
+constexpr size_t saturation_multiplier = 4000;
+
 // Represents a two-dimensional vector, used to pass positions and sizes around.
 // TODO: Copyright or something, copied from original thesis from src/common.hpp
 template<typename T>

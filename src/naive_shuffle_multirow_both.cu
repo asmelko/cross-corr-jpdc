@@ -342,7 +342,7 @@ __device__ void shuffle_multirow_both_impl(
     wind_down<SHIFTS_PER_THREAD - 1, SHIFTS_PER_THREAD>(warp, args, sum);
 
     auto first_output_offset = args.output_pos.linear_idx(args.search_size.x);
-    RES* matrix = args.out;
+    RES* matrix = args.out + blockIdx.z * args.search_size.area();
 
     // TODO: Maybe just check the x axis, Y axis should be filtered out by 0 NUM_RIGHT_ROWS
     if (args.output_pos.x < args.search_size.x && args.output_pos.y < args.search_size.y) {
@@ -536,7 +536,8 @@ __host__ void ccn_shuffle_multirow_both_left_rows_dispatch(
             dim3 num_threads(warp_size, warps_per_thread_block);
             dim3 num_blocks(
                 div_up(search_size.x, num_threads.x),
-                div_up(search_size.y, num_threads.y * MAX_SHIFTS_PER_THREAD)
+                div_up(search_size.y, num_threads.y * MAX_SHIFTS_PER_THREAD),
+                saturation_multiplier
             );
 
             ccn_shuffle_multirow_both<MAX_SHIFTS_PER_THREAD, MAX_LEFT_ROWS><<<num_blocks, num_threads>>>(
