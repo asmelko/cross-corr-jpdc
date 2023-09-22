@@ -9,7 +9,7 @@ set -eu -o pipefail
 
 REPOSITORY_ROOT_DIR="$(dirname "${PWD}")"
 
-BUILD_DIR="${REPOSITORY_ROOT_DIR}/build"
+BUILD_DIR="${REPOSITORY_ROOT_DIR}/build_satur"
 
 mkdir -p "${BUILD_DIR}"
 
