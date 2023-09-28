@@ -39,14 +39,14 @@ benchmark:
           args:
             warps_per_thread_block: [4, 8]
 
-        - name: basic-work_distribution
+        - name: work_distribution
           algorithm: nai_shuffle_work_distribution_one_to_one
           args:
             warps_per_thread_block: [4, 8]
             rows_per_thread: [1, 2, 4, 8, 16]
             distribution_type: ['rectangle', 'triangle']
 
-        - name: basic-multirow_both
+        - name: multirow_both
           algorithm: nai_shuffle_multirow_both_one_to_one
           args:
             warps_per_thread_block: [4, 8]
@@ -116,7 +116,7 @@ benchmark:
           args:
             warps_per_thread_block: [4, 8]
 
-        - name: basic-multirow_both
+        - name: multirow_both
           algorithm: nai_shuffle_multirow_both_one_to_one
           args:
             warps_per_thread_block: [4, 8]
