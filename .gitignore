@@ -13,3 +13,6 @@ benchmarking/jpdc/ada
 benchmarking/jpdc/ampere
 benchmarking/jpdc/volta
 benchmarking/jpdc/jpdc-results
+visualization/ada
+visualization/ampere
+visualization/volta
