@@ -313,12 +313,11 @@ benchmark:
         # All input sizes to measure with
         # Format is matrix_rows, matrix_cols, number of left matrices, number of right matrices
         sizes:
-          - "16x16x10x2560"
-          - "32x32x10x2560"
-          - "64x64x10x2560"
-          - "128x128x10x2560"
-          - "256x256x10x2560"
-          - "512x512x10x2560"
+          - "16x16x100x4000"
+          - "32x32x100x4000"
+          - "64x64x100x4000"
+          - "128x128x100x4000"
+          - "256x256x100x4000"
         # Use float type, not double
         data_type: single
         # Measure the whole Computation, but without data loading from disk
@@ -436,7 +435,6 @@ benchmark:
           - "64x64x128x128"
           - "128x128x128x128"
           - "256x256x128x128"
-          - "512x512x128x128"
         # Use float type, not double
         data_type: single
         # Measure the whole Computation, but without data loading from disk
