@@ -22,9 +22,9 @@ benchmark:
         # Outer iterations run the cross executable again, clearing caches and loading data
         outer_iterations: 1
         # Inner iterations run just the comutation steps with data already loaded in host memory
-        inner_iterations: 1
+        inner_iterations: 10
         # Minimum time measured by adaptive iteration count is 1 second
-        min_measure_seconds: 1
+        min_measure_seconds: 0.1
         # If validation data should be generated and the results compared with it. Here we are only interested in execution times.
         validate: false
         # If result of the computation should be kept. Here we are only interested in the execution times.
@@ -150,9 +150,9 @@ benchmark:
         # Outer iterations run the cross executable again, clearing caches and loading data
         outer_iterations: 1
         # Inner iterations run just the comutation steps with data already loaded in host memory
-        inner_iterations: 1
+        inner_iterations: 10
         # Minimum time measured by adaptive iteration count is 1 second
-        min_measure_seconds: 1
+        min_measure_seconds: 0.1
         # If validation data should be generated and the results compared with it. Here we are only interested in execution times.
         validate: false
         # If result of the computation should be kept. Here we are only interested in the execution times.
