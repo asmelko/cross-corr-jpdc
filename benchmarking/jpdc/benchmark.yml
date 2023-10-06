@@ -58,6 +58,11 @@ benchmark:
           args:
             shifts_per_thread_block: [4, 16, 32]
 
+        - name: warp-per-shift-simple-indexing
+          algorithm: nai_warp_per_shift_simple_indexing_one_to_one
+          args:
+            shifts_per_thread_block: [4, 16, 32]
+
         - name: warp-per-shift-work-distribution
           algorithm: nai_warp_per_shift_work_distribution_one_to_one
           args:
